@@ -1,0 +1,167 @@
+:- use_module(library(clpfd)).
+
+%% ================================================================
+%%  Generic N^2 x N^2 Sudoku solver
+%%  N = box side length:  N=2 -> 4x4,  N=3 -> 9x9,  N=4 -> 16x16
+%% ================================================================
+
+sudoku_n(N, Puzzle, Solution) :-
+    Size is N * N,
+    Total is Size * Size,
+    length(Puzzle,   Total),
+    length(Solution, Total),
+    Solution ins 1..Size,
+    maplist(cell, Puzzle, Solution),
+    Size1 is Size - 1,
+    numlist(0, Size1, Idxs),
+    check_rows(Solution, Size, Idxs),
+    check_cols(Solution, Size, Idxs),
+    check_boxes(Solution, N, Size, Idxs),
+    label(Solution).
+
+cell(0, _).
+cell(V, V) :- V > 0.
+
+%% --- Rows: row R contains cells R*Size .. R*Size+Size-1 ---
+check_rows(Board, Size, Idxs) :-
+    maplist(check_row(Board, Size), Idxs).
+
+check_row(Board, Size, R) :-
+    maplist(row_element(Board, Size, R), Idxs, Row),
+    numlist(0, Size1, Idxs), Size1 is Size - 1,  % forward-declare
+    all_distinct(Row).
+
+row_element(Board, Size, R, C, V) :-
+    Pos is R * Size + C,
+    nth0(Pos, Board, V).
+
+%% --- Columns: col C contains cells C, C+Size, C+2*Size, ... ---
+check_cols(Board, Size, Idxs) :-
+    maplist(check_col(Board, Size, Idxs), Idxs).
+
+check_col(Board, Size, RowIdxs, C) :-
+    maplist(col_element(Board, Size, C), RowIdxs, Col),
+    all_distinct(Col).
+
+col_element(Board, Size, C, R, V) :-
+    Pos is R * Size + C,
+    nth0(Pos, Board, V).
+
+%% --- Boxes: top-left corners at (BR, BC) where BR,BC in {0,N,2N,...} ---
+check_boxes(Board, N, Size, _Idxs) :-
+    Size1 is Size - 1,
+    numlist(0, Size1, All),
+    include(divisible_by(N), All, BoxStarts),
+    forall(
+        (member(BR, BoxStarts), member(BC, BoxStarts)),
+        check_box(Board, N, Size, BR, BC)
+    ).
+
+check_box(Board, N, Size, BR, BC) :-
+    N1 is N - 1,
+    numlist(0, N1, LocalIdxs),
+    findall(V,
+        (member(DR, LocalIdxs), member(DC, LocalIdxs),
+         R is BR + DR, C is BC + DC,
+         Pos is R * Size + C,
+         nth0(Pos, Board, V)),
+        Box),
+    all_distinct(Box).
+
+divisible_by(N, X) :- X mod N =:= 0.
+
+%% ================================================================
+%%  Pretty printer — handles any size, shows box separators
+%% ================================================================
+
+print_board_n(Board, N) :-
+    Size is N * N,
+    Size1 is Size - 1,
+    numlist(0, Size1, Idxs),
+    maplist(print_row_n(Board, N, Size), Idxs),
+    nl.
+
+print_row_n(Board, N, Size, R) :-
+    ( R > 0, R mod N =:= 0 -> print_hsep(N) ; true ),
+    Size1 is Size - 1,
+    numlist(0, Size1, ColIdxs),
+    maplist(print_cell_n(Board, N, Size, R), ColIdxs),
+    nl.
+
+print_cell_n(Board, N, _Size, R, C, _) :-
+    ( C > 0, C mod N =:= 0 -> write('| ') ; true ),
+    Pos is R * _Size + C,
+    nth0(Pos, Board, V),
+    ( V < 10 -> format('~w ', [V]) ; format('~w ', [V]) ).
+
+print_hsep(N) :-
+    Size is N * N,
+    Dashes is Size * 3 + N - 1,
+    length(Ds, Dashes), maplist(=('-'), Ds),
+    atom_chars(Sep, Ds),
+    writeln(Sep).
+
+%% ================================================================
+%%  Example puzzles
+%% ================================================================
+
+example(4, [
+    0,2,0,0,
+    0,0,0,3,
+    3,0,0,0,
+    0,0,1,0
+]).
+
+example(9, [
+    5,3,0, 0,7,0, 0,0,0,
+    6,0,0, 1,9,5, 0,0,0,
+    0,9,8, 0,0,0, 0,6,0,
+    8,0,0, 0,6,0, 0,0,3,
+    4,0,0, 8,0,3, 0,0,1,
+    7,0,0, 0,2,0, 0,0,6,
+    0,6,0, 0,0,0, 2,8,0,
+    0,0,0, 4,1,9, 0,0,5,
+    0,0,0, 0,8,0, 0,7,9
+]).
+
+example(16, [
+    0, 0, 0, 0,  0, 0,13, 0,  0,11, 0, 0,  0, 0, 0, 0,
+    0, 5, 0, 0,  0, 0, 0,11,  0, 0, 0, 0,  0, 3, 0, 0,
+    0, 0, 0, 7,  0, 0, 0, 0,  0, 0, 0,15,  0, 0, 0, 0,
+    0, 0,11, 0,  0, 9, 0, 0,  0, 0, 2, 0,  0, 0,13, 0,
+
+    0, 0, 0, 3,  0, 0, 0, 0,  0, 0, 0, 0,  7, 0, 0, 0,
+    0, 0, 6, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 9, 0, 0,
+    0, 0, 0, 0,  0,14, 0, 0,  0, 0, 4, 0,  0, 0, 0, 0,
+    0, 0, 0, 0,  0, 0, 0,16,  1, 0, 0, 0,  0, 0, 0, 0,
+
+    0, 0, 0, 0,  0, 0, 0, 2, 12, 0, 0, 0,  0, 0, 0, 0,
+    0, 0, 0, 0,  0, 3, 0, 0,  0, 0, 7, 0,  0, 0, 0, 0,
+    0, 0, 4, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 6, 0, 0,
+    0, 0, 0, 8,  0, 0, 0, 0,  0, 0, 0, 0,  3, 0, 0, 0,
+
+    0, 0, 9, 0,  0, 0, 5, 0,  0, 0,16, 0,  0, 0,10, 0,
+    0, 0, 0, 0,  6, 0, 0, 0,  0, 0, 0, 8,  0, 0, 0, 0,
+    0, 7, 0, 0,  0, 0, 0, 0,  4, 0, 0, 0,  0, 0, 1, 0,
+    0, 0, 0, 0,  0, 0, 0, 0,  0,13, 0, 0,  0, 0, 0, 0
+]).
+
+%% ================================================================
+%%  Entry points
+%% ================================================================
+
+solve(N) :-
+    example(N, Puzzle),
+    format('~nSolving ~wx~w sudoku...~n~n', [N,N]),  % N*N x N*N
+    Size is N * N,
+    format('Puzzle:~n'),
+    print_board_n(Puzzle, N),
+    sudoku_n(N, Puzzle, Solution),
+    format('Solution:~n'),
+    print_board_n(Solution, N).
+
+solve_custom(N, Puzzle) :-
+    format('~nSolving ~wx~w sudoku...~n~n', [N,N]),
+    sudoku_n(N, Puzzle, Solution),
+    format('Solution:~n'),
+    print_board_n(Solution, N).
