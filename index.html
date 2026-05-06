@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SUDOKU — Prolog Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:ital,wght@0,300;0,700;0,900;1,300;1,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0e0e10;
+    --surface:  #17171a;
+    --border:   #2a2a30;
+    --accent:   #c8f135;
+    --accent2:  #f1c835;
+    --correct:  #35f1a0;
+    --wrong:    #f13550;
+    --hint:     #35c8f1;
+    --given:    #e8e8f0;
+    --muted:    #5a5a6a;
+    --text:     #d8d8e8;
+    --cell-size: clamp(44px, 8vw, 62px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+  }
+
+  /* ── BACKGROUND GRID ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 900px;
+    padding: 32px 24px 8px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .logo {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(36px, 7vw, 64px);
+    font-weight: 900;
+    letter-spacing: -2px;
+    line-height: 1;
+    color: var(--given);
+  }
+  .logo span { color: var(--accent); }
+
+  .subtitle {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding-bottom: 6px;
+  }
+
+  /* ── DIFFICULTY ── */
+  .difficulty-bar {
+    position: relative; z-index: 1;
+    display: flex; gap: 6px;
+    padding: 12px 0;
+  }
+
+  .diff-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .diff-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .diff-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 700;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 900px;
+    padding: 0 24px 48px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 32px;
+    align-items: start;
+  }
+
+  @media (max-width: 680px) {
+    main { grid-template-columns: 1fr; }
+  }
+
+  /* ── BOARD ── */
+  .board-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(9, var(--cell-size));
+    grid-template-rows: repeat(9, var(--cell-size));
+    border: 2px solid var(--given);
+    gap: 0;
+  }
+
+  .cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(16px, 3.5vw, 24px);
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    position: relative;
+    transition: background 0.15s, color 0.15s;
+    user-select: none;
+    outline: none;
+    background: var(--surface);
+    color: var(--accent);
+  }
+
+  /* thick box borders */
+  .cell:nth-child(3n+1):not(:nth-child(9n+1)) { border-left: 2px solid var(--muted); }
+  .cell:nth-child(n+19):nth-child(-n+27),
+  .cell:nth-child(n+46):nth-child(-n+54) { border-bottom: 2px solid var(--muted); }
+
+  .cell.given {
+    color: var(--given);
+    cursor: default;
+    background: #1d1d22;
+  }
+  .cell.selected { background: #1f2820; box-shadow: inset 0 0 0 2px var(--accent); }
+  .cell.related  { background: #1a1a20; }
+  .cell.correct  { color: var(--correct) !important; }
+  .cell.incorrect{ color: var(--wrong) !important; animation: shake 0.3s; }
+  .cell.hint-flash { color: var(--hint) !important; animation: pulse 0.6s ease; }
+  .cell.pencil-mode { font-size: 8px; color: var(--muted); }
+
+  .cell input {
+    position: absolute; inset: 0;
+    opacity: 0; width: 100%; height: 100%;
+    cursor: pointer;
+  }
+
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+  @keyframes pulse {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+
+  /* ── TIMER ── */
+  .timer {
+    font-size: 28px;
+    letter-spacing: 4px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .timer.warning { color: var(--accent2); }
+
+  /* ── NUMPAD ── */
+  .numpad {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 6px;
+    width: 100%;
+    max-width: calc(var(--cell-size) * 9);
+  }
+
+  .num-btn {
+    aspect-ratio: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Fraunces', serif;
+    font-size: clamp(16px, 3vw, 22px);
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .num-btn:hover {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+  .num-btn.erase { font-size: 14px; font-family: 'DM Mono', monospace; }
+
+  /* ── SIDE PANEL ── */
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-top: 48px;
+    min-width: 180px;
+  }
+
+  .action-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 14px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  .action-btn::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    transform: scaleY(0);
+    transition: transform 0.2s;
+  }
+  .action-btn:hover::before { transform: scaleY(1); }
+  .action-btn:hover { border-color: var(--accent); color: var(--accent); padding-left: 24px; }
+
+  .action-btn.verify::before  { background: var(--correct); }
+  .action-btn.verify:hover    { border-color: var(--correct); color: var(--correct); }
+  .action-btn.hint::before    { background: var(--hint); }
+  .action-btn.hint:hover      { border-color: var(--hint); color: var(--hint); }
+  .action-btn.solve::before   { background: var(--accent2); }
+  .action-btn.solve:hover     { border-color: var(--accent2); color: var(--accent2); }
+  .action-btn.new-game::before { background: var(--muted); }
+
+  .btn-icon { font-size: 16px; flex-shrink: 0; }
+
+  /* ── STATUS MESSAGE ── */
+  #status {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 24px;
+    font-size: 13px;
+    letter-spacing: 1px;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+    opacity: 0;
+    z-index: 100;
+    white-space: nowrap;
+  }
+  #status.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  #status.success { border-color: var(--correct); color: var(--correct); }
+  #status.error   { border-color: var(--wrong); color: var(--wrong); }
+  #status.info    { border-color: var(--hint); color: var(--hint); }
+  #status.warn    { border-color: var(--accent2); color: var(--accent2); }
+
+  /* ── WIN OVERLAY ── */
+  #win-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(14,14,16,0.92);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 24px;
+  }
+  #win-overlay.show { display: flex; }
+  .win-title {
+    font-family: 'Fraunces', serif;
+    font-size: 80px;
+    font-weight: 900;
+    color: var(--accent);
+    letter-spacing: -4px;
+    animation: winPop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .win-sub { color: var(--muted); font-size: 14px; letter-spacing: 3px; }
+  .win-time { color: var(--accent2); font-size: 32px; letter-spacing: 4px; }
+  @keyframes winPop {
+    0%   { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1);   opacity: 1; }
+  }
+
+  /* ── PENCIL TOGGLE ── */
+  .pencil-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .pencil-toggle input { display: none; }
+  .toggle-track {
+    width: 36px; height: 20px;
+    background: var(--border);
+    border-radius: 10px;
+    position: relative;
+    transition: background 0.2s;
+  }
+  .toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 14px; height: 14px;
+    background: var(--muted);
+    border-radius: 50%;
+    transition: transform 0.2s, background 0.2s;
+  }
+  input:checked + .toggle-track { background: var(--accent); }
+  input:checked + .toggle-track::after { transform: translateX(16px); background: #000; }
+
+
+
+  /* ── SERVER STATUS ── */
+  .server-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 24px;
+  }
+  .server-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--wrong);
+  }
+  .server-dot.online { background: var(--correct); }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">SU<span>•</span>DOKU</div>
+    <div class="subtitle">Powered by SWI-Prolog</div>
+  </div>
+  <div style="text-align:right">
+    <div class="timer" id="timer">00:00</div>
+
+  </div>
+</header>
+
+<div style="position:relative;z-index:1;width:100%;max-width:900px;padding:0 24px;">
+  <div class="difficulty-bar">
+    <button class="diff-btn active" data-diff="easy">Easy</button>
+    <button class="diff-btn" data-diff="medium">Medium</button>
+    <button class="diff-btn" data-diff="hard">Hard</button>
+    <button class="diff-btn" data-diff="expert">Expert</button>
+  </div>
+  <div class="server-badge">
+    <div class="server-dot" id="server-dot"></div>
+    <span id="server-label">Prolog server</span>
+  </div>
+</div>
+
+<main>
+  <div class="board-wrap">
+    <div id="board"></div>
+    <div class="numpad" id="numpad"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:calc(var(--cell-size)*9)">
+      <label class="pencil-toggle">
+        <input type="checkbox" id="pencil-check">
+        <div class="toggle-track"></div>
+        ✏️ Notes
+      </label>
+    </div>
+  </div>
+
+  <div class="side-panel">
+    <button class="action-btn new-game" onclick="newGame()">
+      <span class="btn-icon">⚡</span> New Game
+    </button>
+    <div class="divider"></div>
+    <button class="action-btn verify" onclick="verifyBoard()">
+      <span class="btn-icon">✓</span> Verify
+    </button>
+    <button class="action-btn hint" onclick="getHint()">
+      <span class="btn-icon">◈</span> Hint
+    </button>
+    <button class="action-btn solve" onclick="solveBoard()">
+      <span class="btn-icon">∞</span> Solve
+    </button>
+  </div>
+</main>
+
+<div id="win-overlay">
+  <div class="win-title">SOLVED</div>
+  <div class="win-time" id="win-time">00:00</div>
+  <div class="win-sub">PUZZLE COMPLETE</div>
+  <button class="action-btn new-game" onclick="newGame();document.getElementById('win-overlay').classList.remove('show')">
+    <span class="btn-icon">⚡</span> Play Again
+  </button>
+</div>
+
+<div id="status"></div>
+
+<script>
+// ============================================================
+// PUZZLE LIBRARY (fallback when server offline)
+// ============================================================
+// RANDOM PUZZLE GENERATOR
+// ============================================================
+
+// How many clues to leave per difficulty
+const CLUE_COUNT = { easy: 38, medium: 30, hard: 25, expert: 22 };
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// Generate a fully solved board by filling with shuffled digits
+function generateSolvedBoard() {
+  const b = Array(81).fill(0);
+  fillBoard(b);
+  return b;
+}
+
+function fillBoard(b) {
+  const idx = b.indexOf(0);
+  if (idx === -1) return true;
+  const nums = shuffle([1,2,3,4,5,6,7,8,9]);
+  for (const n of nums) {
+    if (isValid(b, idx, n)) {
+      b[idx] = n;
+      if (fillBoard(b)) return true;
+      b[idx] = 0;
+    }
+  }
+  return false;
+}
+
+// Count solutions (stops at 2 to check uniqueness)
+function countSolutions(b, limit = 2) {
+  const idx = b.indexOf(0);
+  if (idx === -1) return 1;
+  let count = 0;
+  for (let n = 1; n <= 9; n++) {
+    if (isValid(b, idx, n)) {
+      b[idx] = n;
+      count += countSolutions(b, limit);
+      b[idx] = 0;
+      if (count >= limit) return count;
+    }
+  }
+  return count;
+}
+
+function generatePuzzle(diff) {
+  const solved = generateSolvedBoard();
+  const puzzle = [...solved];
+  const clues = CLUE_COUNT[diff] || 30;
+  const toRemove = 81 - clues;
+
+  // Shuffle indices and remove cells one by one, keeping unique solution
+  const indices = shuffle([...Array(81).keys()]);
+  let removed = 0;
+  for (const idx of indices) {
+    if (removed >= toRemove) break;
+    const backup = puzzle[idx];
+    puzzle[idx] = 0;
+    const copy = [...puzzle];
+    if (countSolutions(copy) === 1) {
+      removed++;
+    } else {
+      puzzle[idx] = backup; // restore if uniqueness broken
+    }
+  }
+  return { puzzle, solution: solved };
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let puzzle    = [];   // original puzzle (given clues)
+let board     = [];   // current user board
+let solution  = [];   // known solution (from server or local solver)
+let selected  = -1;
+let timerSec  = 0;
+let timerInt  = null;
+let pencilMode = false;
+let notes     = Array(81).fill(null).map(() => new Set());
+let difficulty = 'easy';
+let serverOnline = false;
+
+const API = 'http://localhost:8080';
+
+// ============================================================
+// SERVER CHECK
+// ============================================================
+async function checkServer() {
+  try {
+    const res = await fetch(API + '/solve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ puzzle: [5,3,0,0,7,0,0,0,0,6,0,0,1,9,5,0,0,0,0,9,8,0,0,0,0,6,0,8,0,0,0,6,0,0,0,3,4,0,0,8,0,3,0,0,1,7,0,0,0,2,0,0,0,6,0,6,0,0,0,0,2,8,0,0,0,0,4,1,9,0,0,5,0,0,0,0,8,0,0,7,9] }),
+      signal: AbortSignal.timeout(2000),
+    });
+    serverOnline = res.ok;
+  } catch { serverOnline = false; }
+  document.getElementById('server-dot').className = 'server-dot' + (serverOnline ? ' online' : '');
+  document.getElementById('server-label').textContent = serverOnline ? 'Prolog — online' : 'Prolog — offline (local mode)';
+}
+
+// ============================================================
+// GAME INIT
+// ============================================================
+function newGame() {
+  showStatus('Generating puzzle…', 'info');
+  // Run generation async so the status message renders first
+  setTimeout(() => {
+    const generated = generatePuzzle(difficulty);
+    puzzle   = generated.puzzle;
+    solution = generated.solution;
+    board    = [...puzzle];
+    notes    = Array(81).fill(null).map(() => new Set());
+    resetTimer();
+    startTimer();
+    selected = -1;
+    renderBoard();
+  }, 30);
+}
+
+// ============================================================
+// LOCAL BACKTRACKING SOLVER (JS fallback)
+// ============================================================
+function localSolve(puz, cb) {
+  const b = [...puz];
+  if (solve(b)) cb(b);
+}
+
+function solve(b) {
+  const idx = b.indexOf(0);
+  if (idx === -1) return true;
+  for (let n = 1; n <= 9; n++) {
+    if (isValid(b, idx, n)) {
+      b[idx] = n;
+      if (solve(b)) return true;
+      b[idx] = 0;
+    }
+  }
+  return false;
+}
+
+function isValid(b, idx, n) {
+  const row = Math.floor(idx / 9), col = idx % 9;
+  for (let c = 0; c < 9; c++) if (b[row*9+c] === n) return false;
+  for (let r = 0; r < 9; r++) if (b[r*9+col] === n) return false;
+  const br = Math.floor(row/3)*3, bc = Math.floor(col/3)*3;
+  for (let dr = 0; dr < 3; dr++)
+    for (let dc = 0; dc < 3; dc++)
+      if (b[(br+dr)*9+(bc+dc)] === n) return false;
+  return true;
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderBoard() {
+  const boardEl = document.getElementById('board');
+  boardEl.innerHTML = '';
+  for (let i = 0; i < 81; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.tabIndex = 0;
+    cell.dataset.idx = i;
+
+    const isGiven = puzzle[i] !== 0;
+    if (isGiven) cell.classList.add('given');
+
+    if (notes[i].size > 0 && board[i] === 0) {
+      cell.classList.add('pencil-mode');
+      cell.textContent = [...notes[i]].sort().join(' ');
+    } else if (board[i] !== 0) {
+      cell.textContent = board[i];
+    }
+
+    cell.addEventListener('click', () => selectCell(i));
+    boardEl.appendChild(cell);
+  }
+  highlightRelated();
+}
+
+function selectCell(idx) {
+  selected = idx;
+  highlightRelated();
+}
+
+function highlightRelated() {
+  const cells = document.querySelectorAll('.cell');
+  cells.forEach((c, i) => {
+    c.classList.remove('selected','related');
+    if (i === selected) { c.classList.add('selected'); return; }
+    if (selected === -1) return;
+    const sr = Math.floor(selected/9), sc = selected%9;
+    const cr = Math.floor(i/9), cc = i%9;
+    if (sr===cr || sc===cc ||
+        (Math.floor(sr/3)===Math.floor(cr/3) && Math.floor(sc/3)===Math.floor(cc/3))) {
+      c.classList.add('related');
+    }
+    // highlight same number
+    if (board[selected] && board[i] === board[selected]) c.classList.add('related');
+  });
+}
+
+// ============================================================
+// NUMPAD
+// ============================================================
+function buildNumpad() {
+  const np = document.getElementById('numpad');
+  np.innerHTML = '';
+  for (let n = 1; n <= 9; n++) {
+    const btn = document.createElement('button');
+    btn.className = 'num-btn';
+    btn.textContent = n;
+    btn.addEventListener('click', () => enterNumber(n));
+    np.appendChild(btn);
+  }
+}
+
+function enterNumber(n) {
+  if (selected === -1) return;
+  if (puzzle[selected] !== 0) return;
+
+  if (pencilMode) {
+    if (notes[selected].has(n)) notes[selected].delete(n);
+    else notes[selected].add(n);
+    board[selected] = 0;
+    renderBoard();
+    return;
+  }
+
+  notes[selected].clear();
+  board[selected] = n;
+  renderBoard();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key >= '1' && e.key <= '9') enterNumber(+e.key);
+  if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
+    if (selected !== -1 && puzzle[selected] === 0) {
+      board[selected] = 0;
+      notes[selected].clear();
+      renderBoard();
+    }
+  }
+  // Arrow navigation
+  const arrows = { ArrowUp:-9, ArrowDown:9, ArrowLeft:-1, ArrowRight:1 };
+  if (arrows[e.key] !== undefined && selected !== -1) {
+    e.preventDefault();
+    const next = selected + arrows[e.key];
+    if (next >= 0 && next < 81) selectCell(next);
+  }
+});
+
+// ============================================================
+// VERIFY
+// ============================================================
+async function verifyBoard() {
+  if (serverOnline) {
+    try {
+      const res = await fetch(API + '/verify', {
+        method: 'POST', headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ puzzle, current: board })
+      });
+      const data = await res.json();
+      if (data.success) {
+        applyVerifyResults(data.results);
+        return;
+      }
+    } catch {}
+  }
+  // Local verify
+  if (!solution.length) { showStatus('Solving locally…', 'info'); return; }
+  const results = board.map((v,i) => ({
+    index: i,
+    status: v===0 ? 'empty' : v===solution[i] ? 'correct' : 'incorrect'
+  }));
+  applyVerifyResults(results);
+}
+
+function applyVerifyResults(results) {
+  const cells = document.querySelectorAll('.cell');
+  let wrongs = 0, corrects = 0, empties = 0;
+  results.forEach(r => {
+    if (r.status === 'incorrect') { cells[r.index].classList.add('incorrect'); wrongs++; }
+    if (r.status === 'correct' && !puzzle[r.index]) { cells[r.index].classList.add('correct'); corrects++; }
+    if (r.status === 'empty') empties++;
+  });
+
+  const totalUserCells = results.filter(r => !puzzle[r.index]).length;
+
+  if (wrongs === 0 && empties === 0 && corrects === totalUserCells) {
+    // All filled and all correct — win!
+    setTimeout(() => onWin(), 600);
+  } else if (wrongs === 0 && corrects > 0) {
+    showStatus(`✓ All ${corrects} filled cells correct!`, 'success');
+  } else if (wrongs > 0) {
+    showStatus(`✗ ${wrongs} incorrect cell${wrongs>1?'s':''}`, 'error');
+  } else {
+    showStatus('No user cells to verify yet', 'info');
+  }
+
+  setTimeout(() => {
+    document.querySelectorAll('.cell.incorrect,.cell.correct').forEach(c => {
+      c.classList.remove('incorrect','correct');
+    });
+  }, 3000);
+}
+
+// ============================================================
+// HINT
+// ============================================================
+async function getHint() {
+  if (serverOnline) {
+    try {
+      const res = await fetch(API + '/hint', {
+        method: 'POST', headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ puzzle, current: board })
+      });
+      const data = await res.json();
+      if (data.success && data.index >= 0) {
+        applyHint(data.index, data.value);
+        return;
+      }
+    } catch {}
+  }
+  // Local hint
+  if (!solution.length) { showStatus('Computing…', 'info'); return; }
+  const emptyCells = board.reduce((acc, v, i) => { if (v === 0) acc.push(i); return acc; }, []);
+  if (emptyCells.length === 0) { showStatus('Board is complete!', 'success'); return; }
+  const idx = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+  applyHint(idx, solution[idx]);
+}
+
+function applyHint(idx, val) {
+  board[idx] = val;
+  notes[idx].clear();
+  renderBoard();
+  flashCell(idx, 'hint-flash');
+  showStatus(`◈ Hint: ${val} placed`, 'info');
+}
+
+// ============================================================
+// SOLVE
+// ============================================================
+async function solveBoard() {
+  if (serverOnline) {
+    try {
+      showStatus('Prolog solving…', 'info');
+      const res = await fetch(API + '/solve', {
+        method: 'POST', headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ puzzle })
+      });
+      const data = await res.json();
+      if (data.success) {
+        animateSolve(data.solution);
+        solution = data.solution;
+        return;
+      }
+    } catch {}
+  }
+  // Local solve
+  showStatus('Solving locally…', 'info');
+  setTimeout(() => {
+    localSolve(puzzle, sol => {
+      solution = sol;
+      animateSolve(sol);
+    });
+  }, 50);
+}
+
+function animateSolve(sol) {
+  stopTimer();
+  const empties = [];
+  sol.forEach((v,i) => { if (puzzle[i]===0) empties.push({i,v}); });
+  let k = 0;
+  const interval = setInterval(() => {
+    if (k >= empties.length) {
+      clearInterval(interval);
+      showStatus('∞ Puzzle solved by Prolog!', 'success');
+      return;
+    }
+    const {i,v} = empties[k++];
+    board[i] = v;
+    notes[i].clear();
+    renderBoard();
+    flashCell(i, 'hint-flash');
+  }, 20);
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function flashCell(idx, cls) {
+  const cell = document.querySelector(`.cell[data-idx="${idx}"]`);
+  if (!cell) return;
+  cell.classList.add(cls);
+  setTimeout(() => cell.classList.remove(cls), 700);
+}
+
+function showStatus(msg, type='info') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+function onWin() {
+  stopTimer();
+  document.getElementById('win-time').textContent = formatTime(timerSec);
+  document.getElementById('win-overlay').classList.add('show');
+}
+
+// ── TIMER ──
+function startTimer() {
+  timerInt = setInterval(() => {
+    timerSec++;
+    const el = document.getElementById('timer');
+    el.textContent = formatTime(timerSec);
+    el.className = 'timer' + (timerSec > 600 ? ' warning' : '');
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerInt); }
+function resetTimer() { stopTimer(); timerSec = 0; document.getElementById('timer').textContent = '00:00'; }
+function formatTime(s) {
+  const m = Math.floor(s/60).toString().padStart(2,'0');
+  const ss = (s%60).toString().padStart(2,'0');
+  return `${m}:${ss}`;
+}
+
+// ── PENCIL TOGGLE ──
+document.getElementById('pencil-check').addEventListener('change', e => {
+  pencilMode = e.target.checked;
+});
+
+// ── DIFFICULTY ──
+document.querySelectorAll('.diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    difficulty = btn.dataset.diff;
+    newGame();
+  });
+});
+
+// ============================================================
+// BOOT
+// ============================================================
+buildNumpad();
+checkServer().then(() => newGame());
+setInterval(checkServer, 10000); // re-check every 10s
+</script>
+</body>
+</html>
