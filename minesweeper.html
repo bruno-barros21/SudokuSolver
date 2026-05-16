@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MINESWEEPER</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:ital,wght@0,300;0,700;0,900;1,300;1,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #0e0e10;
+    --surface: #17171a;
+    --border:  #2a2a30;
+    --accent:  #c8f135;
+    --accent2: #f1c835;
+    --correct: #35f1a0;
+    --wrong:   #f13550;
+    --hint:    #35c8f1;
+    --given:   #e8e8f0;
+    --muted:   #5a5a6a;
+    --text:    #d8d8e8;
+
+    --cell-size: clamp(28px, 4.5vw, 42px);
+
+    --n1: #35c8f1; --n2: #35f1a0; --n3: #f13550;
+    --n4: #7b5cf1; --n5: #f1c835; --n6: #f17b35;
+    --n7: #e8e8f0; --n8: #5a5a6a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 1000px;
+    padding: 32px 24px 8px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .logo {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(28px, 6vw, 56px);
+    font-weight: 900;
+    letter-spacing: -2px;
+    line-height: 1;
+    color: var(--given);
+  }
+  .logo span { color: var(--accent); }
+  .subtitle {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding-bottom: 6px;
+  }
+
+  .header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+
+  .timer {
+    font-size: 28px;
+    letter-spacing: 4px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── DIFFICULTY ── */
+  .difficulty-bar {
+    position: relative; z-index: 1;
+    display: flex; gap: 6px;
+    padding: 12px 0;
+    flex-wrap: wrap;
+  }
+  .diff-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .diff-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .diff-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 700;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 1000px;
+    padding: 0 24px 48px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 32px;
+    align-items: start;
+  }
+  @media (max-width: 700px) {
+    main { grid-template-columns: 1fr; }
+  }
+
+  .board-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    overflow-x: auto;
+  }
+
+  /* ── BOARD ── */
+  #board {
+    display: grid;
+    border: 2px solid var(--given);
+    gap: 0;
+    flex-shrink: 0;
+  }
+
+  .cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(11px, 2vw, 16px);
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    position: relative;
+    transition: background 0.1s;
+    user-select: none;
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .cell:hover:not(.revealed) { background: #202025; }
+
+  .cell.revealed {
+    background: #111114;
+    cursor: default;
+  }
+  .cell.revealed.n1 { color: var(--n1); }
+  .cell.revealed.n2 { color: var(--n2); }
+  .cell.revealed.n3 { color: var(--n3); }
+  .cell.revealed.n4 { color: var(--n4); }
+  .cell.revealed.n5 { color: var(--n5); }
+  .cell.revealed.n6 { color: var(--n6); }
+  .cell.revealed.n7 { color: var(--n7); }
+  .cell.revealed.n8 { color: var(--n8); }
+
+  .cell.flagged { color: var(--wrong); }
+  .cell.question { color: var(--accent2); }
+
+  .cell.mine-hit {
+    background: var(--wrong) !important;
+    color: #000 !important;
+    animation: shake 0.3s;
+  }
+  .cell.mine-revealed {
+    background: #1a1014;
+    color: var(--wrong);
+    cursor: default;
+  }
+  .cell.flag-wrong {
+    background: #1a1014;
+    color: var(--wrong);
+  }
+
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    75% { transform: translateX(3px); }
+  }
+  @keyframes reveal {
+    0%   { transform: scale(0.85); opacity: 0.5; }
+    100% { transform: scale(1);    opacity: 1; }
+  }
+  .cell.reveal-anim { animation: reveal 0.12s ease; }
+
+  /* ── MINE COUNTER ── */
+  .mine-counter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 20px;
+    letter-spacing: 3px;
+    color: var(--wrong);
+    font-variant-numeric: tabular-nums;
+  }
+  .mine-counter span { font-size: 13px; color: var(--muted); letter-spacing: 2px; }
+
+  /* ── SIDE PANEL ── */
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-top: 48px;
+    min-width: 180px;
+  }
+
+  .action-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 14px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+  }
+  .action-btn::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    transform: scaleY(0);
+    transition: transform 0.2s;
+  }
+  .action-btn:hover::before { transform: scaleY(1); }
+  .action-btn:hover { border-color: var(--accent); color: var(--accent); padding-left: 24px; }
+  .action-btn.new-game::before { background: var(--muted); }
+  .action-btn.flag-mode::before { background: var(--wrong); }
+  .action-btn.flag-mode:hover  { border-color: var(--wrong); color: var(--wrong); }
+  .action-btn.flag-mode.active {
+    border-color: var(--wrong);
+    color: var(--wrong);
+    padding-left: 24px;
+  }
+  .action-btn.flag-mode.active::before { transform: scaleY(1); }
+
+  .action-btn.qmark::before { background: var(--accent2); }
+  .action-btn.qmark:hover  { border-color: var(--accent2); color: var(--accent2); }
+  .action-btn.qmark.active {
+    border-color: var(--accent2);
+    color: var(--accent2);
+    padding-left: 24px;
+  }
+  .action-btn.qmark.active::before { transform: scaleY(1); }
+
+  .btn-icon { font-size: 16px; flex-shrink: 0; }
+
+  .panel-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 4px 0;
+  }
+
+  .panel-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 4px 0 2px;
+  }
+
+  /* ── LEADERBOARD ── */
+  .leaderboard {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .lb-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .lb-row .lb-diff { text-transform: uppercase; letter-spacing: 2px; }
+  .lb-row .lb-time { color: var(--accent2); font-size: 13px; letter-spacing: 2px; }
+  .lb-row .lb-time.empty { color: var(--border); }
+
+  /* ── STATUS ── */
+  #status {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 24px;
+    font-size: 13px;
+    letter-spacing: 1px;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+    opacity: 0;
+    z-index: 100;
+    white-space: nowrap;
+  }
+  #status.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  #status.success { border-color: var(--correct); color: var(--correct); }
+  #status.error   { border-color: var(--wrong);   color: var(--wrong); }
+  #status.info    { border-color: var(--hint);     color: var(--hint); }
+  #status.warn    { border-color: var(--accent2);  color: var(--accent2); }
+
+  .action-btn.solver::before  { background: var(--hint); }
+  .action-btn.solver:hover    { border-color: var(--hint); color: var(--hint); }
+  .action-btn.solver:disabled { opacity: 0.35; cursor: not-allowed; }
+  .action-btn.solver:disabled:hover { border-color: var(--border); color: var(--text); padding-left: 20px; }
+  .action-btn.solver:disabled:hover::before { transform: scaleY(0); }
+
+  /* solver highlights */
+  .cell.safe-hint  { box-shadow: inset 0 0 0 2px var(--correct) !important; }
+  .cell.mine-hint  { box-shadow: inset 0 0 0 2px var(--wrong)   !important; }
+
+  /* server dot */
+  .server-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 2px 0;
+  }
+  .server-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+  .server-dot.online { background: var(--correct); box-shadow: 0 0 6px var(--correct); }
+  #end-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(14,14,16,0.92);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+  }
+  #end-overlay.show { display: flex; }
+
+  .end-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(56px, 10vw, 88px);
+    font-weight: 900;
+    letter-spacing: -4px;
+    animation: winPop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .end-title.win  { color: var(--accent); }
+  .end-title.lose { color: var(--wrong); }
+
+  .end-sub  { color: var(--muted); font-size: 14px; letter-spacing: 3px; }
+  .end-time { color: var(--accent2); font-size: 32px; letter-spacing: 4px; }
+  .end-best { color: var(--correct); font-size: 13px; letter-spacing: 2px; }
+
+  .end-btn {
+    margin-top: 12px;
+    background: none;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 14px 36px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .end-btn:hover { background: var(--accent); color: #000; }
+
+  @keyframes winPop {
+    0%   { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1);   opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">MINE<span>sweeper</span></div>
+    <div class="subtitle">Classic · Random · Infinite</div>
+  </div>
+  <div class="header-right">
+    <div class="timer" id="timer">00:00</div>
+    <div class="mine-counter">
+      <span>MINES</span>
+      <span id="mine-count">000</span>
+    </div>
+  </div>
+</header>
+
+<div class="difficulty-bar" id="diff-bar" style="position:relative;z-index:1;padding:4px 24px 8px;">
+  <button class="diff-btn active" data-diff="easy"   onclick="setDiff('easy')">Easy</button>
+  <button class="diff-btn"        data-diff="medium"  onclick="setDiff('medium')">Medium</button>
+  <button class="diff-btn"        data-diff="hard"    onclick="setDiff('hard')">Hard</button>
+</div>
+
+<main>
+  <div class="board-wrap">
+    <div id="board"></div>
+  </div>
+
+  <div class="side-panel">
+    <button class="action-btn new-game" onclick="newGame()">
+      <span class="btn-icon">◈</span> New Game
+    </button>
+
+    <hr class="panel-divider">
+
+    <button class="action-btn flag-mode" id="flag-btn" onclick="toggleFlagMode()">
+      <span class="btn-icon">⚑</span> Flag
+    </button>
+    <button class="action-btn qmark" id="qmark-btn" onclick="toggleQmarkMode()">
+      <span class="btn-icon">?</span> Question
+    </button>
+
+    <hr class="panel-divider">
+
+    <button class="action-btn solver" id="solver-btn" onclick="solveStep()">
+      <span class="btn-icon">⬡</span> Solve Step
+    </button>
+
+    <div class="server-status">
+      <div class="server-dot" id="server-dot"></div>
+      <span id="server-label">Prolog offline</span>
+    </div>
+
+    <hr class="panel-divider">
+
+    <div class="panel-label">Best Times</div>
+    <div class="leaderboard" id="leaderboard"></div>
+  </div>
+</main>
+
+<!-- Win / Lose overlay -->
+<div id="end-overlay">
+  <div class="end-title" id="end-title">YOU WIN</div>
+  <div class="end-sub"  id="end-sub">CLEARED</div>
+  <div class="end-time" id="end-time">00:00</div>
+  <div class="end-best" id="end-best"></div>
+  <button class="end-btn" onclick="newGame(); hideOverlay()">Play Again</button>
+</div>
+
+<div id="status"></div>
+
+<script>
+console.log('[MS] Script starting...');
+// ============================================================
+const CONFIGS = {
+  easy:   { rows: 9,  cols: 9,  mines: 10 },
+  medium: { rows: 16, cols: 16, mines: 40 },
+  hard:   { rows: 16, cols: 30, mines: 99 },
+};
+
+// ============================================================
+// STATE
+// ============================================================
+let cfg       = CONFIGS.easy;
+let difficulty = 'easy';
+let mines     = [];   // flat array, true = mine
+let counts    = [];   // neighbour mine counts
+let revealed  = [];
+let flagged   = [];
+let questioned = [];
+let gameState = 'idle'; // idle | playing | won | lost
+let firstClick = true;
+let timerSec  = 0;
+let timerInt  = null;
+let flagMode  = false;
+let qmarkMode = false;
+let bestTimes = JSON.parse(localStorage.getItem('ms_best') || '{}');
+
+// ============================================================
+// UTILS
+// ============================================================
+function idx(r, c) { return r * cfg.cols + c; }
+function rc(i)     { return [Math.floor(i / cfg.cols), i % cfg.cols]; }
+
+function neighbours(r, c) {
+  const out = [];
+  for (let dr = -1; dr <= 1; dr++)
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < cfg.rows && nc >= 0 && nc < cfg.cols)
+        out.push(idx(nr, nc));
+    }
+  return out;
+}
+
+function pad(n, w=2) { return String(n).padStart(w, '0'); }
+function fmtTime(s)  { return `${pad(Math.floor(s/60))}:${pad(s%60)}`; }
+
+// ============================================================
+// TIMER
+// ============================================================
+function startTimer() {
+  timerSec = 0;
+  clearInterval(timerInt);
+  timerInt = setInterval(() => {
+    timerSec++;
+    document.getElementById('timer').textContent = fmtTime(timerSec);
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerInt); }
+function resetTimer() {
+  stopTimer();
+  timerSec = 0;
+  document.getElementById('timer').textContent = '00:00';
+}
+
+// ============================================================
+// GENERATE
+// ============================================================
+function generateBoard(safeIdx) {
+  const total = cfg.rows * cfg.cols;
+  mines   = Array(total).fill(false);
+  counts  = Array(total).fill(0);
+
+  // Safe zone: clicked cell + its neighbours
+  const safe = new Set([safeIdx, ...neighbours(...rc(safeIdx))]);
+
+  // Place mines randomly avoiding safe zone
+  let placed = 0;
+  while (placed < cfg.mines) {
+    const i = Math.floor(Math.random() * total);
+    if (!mines[i] && !safe.has(i)) { mines[i] = true; placed++; }
+  }
+
+  // Compute neighbour counts
+  for (let i = 0; i < total; i++) {
+    if (mines[i]) continue;
+    counts[i] = neighbours(...rc(i)).filter(j => mines[j]).length;
+  }
+}
+
+// ============================================================
+// REVEAL (flood fill)
+// ============================================================
+function reveal(i) {
+  if (revealed[i] || flagged[i] || questioned[i]) return;
+  revealed[i] = true;
+
+  const cell = document.querySelector(`[data-idx="${i}"]`);
+  if (cell) {
+    cell.classList.add('revealed', 'reveal-anim');
+    renderCell(i, cell);
+  }
+
+  // Flood fill on empty cells
+  if (!mines[i] && counts[i] === 0) {
+    neighbours(...rc(i)).forEach(j => {
+      if (!revealed[j]) reveal(j);
+    });
+  }
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderCell(i, el) {
+  el = el || document.querySelector(`[data-idx="${i}"]`);
+  if (!el) return;
+
+  el.className = 'cell';
+  el.textContent = '';
+
+  if (revealed[i]) {
+    el.classList.add('revealed');
+    if (mines[i]) {
+      el.textContent = '✸';
+    } else if (counts[i] > 0) {
+      el.classList.add(`n${counts[i]}`);
+      el.textContent = counts[i];
+    }
+  } else if (flagged[i]) {
+    el.classList.add('flagged');
+    el.textContent = '⚑';
+  } else if (questioned[i]) {
+    el.classList.add('question');
+    el.textContent = '?';
+  }
+}
+
+function renderBoard() {
+  const board = document.getElementById('board');
+  board.style.gridTemplateColumns = `repeat(${cfg.cols}, var(--cell-size))`;
+  board.style.gridTemplateRows    = `repeat(${cfg.rows}, var(--cell-size))`;
+  board.innerHTML = '';
+
+  const total = cfg.rows * cfg.cols;
+  for (let i = 0; i < total; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.dataset.idx = i;
+    cell.addEventListener('click',       () => onLeftClick(i));
+    cell.addEventListener('contextmenu', e  => { e.preventDefault(); onRightClick(i); });
+    board.appendChild(cell);
+    renderCell(i, cell);
+  }
+  updateMineCounter();
+}
+
+function updateMineCounter() {
+  const remaining = cfg.mines - flagged.filter(Boolean).length;
+  document.getElementById('mine-count').textContent = pad(Math.max(0, remaining), 3);
+}
+
+// ============================================================
+// INPUT HANDLERS
+// ============================================================
+function onLeftClick(i) {
+  if (gameState === 'won' || gameState === 'lost') return;
+  if (flagged[i] || questioned[i]) return;
+  if (revealed[i]) { chordReveal(i); return; }
+
+  // Flag / question mode — left click acts as right click
+  if (flagMode || qmarkMode) { onRightClick(i); return; }
+
+  if (firstClick) {
+    firstClick = false;
+    generateBoard(i);
+    gameState = 'playing';
+    startTimer();
+  }
+
+  if (mines[i]) {
+    onLose(i);
+    return;
+  }
+
+  reveal(i);
+  checkWin();
+}
+
+function onRightClick(i) {
+  if (gameState === 'won' || gameState === 'lost') return;
+  if (revealed[i]) return;
+
+  if (flagged[i]) {
+    flagged[i] = false;
+    questioned[i] = true;
+  } else if (questioned[i]) {
+    questioned[i] = false;
+  } else {
+    flagged[i] = true;
+  }
+
+  renderCell(i);
+  updateMineCounter();
+}
+
+// Chord reveal: if revealed cell's neighbour flags == count, reveal rest
+function chordReveal(i) {
+  if (!revealed[i] || mines[i] || counts[i] === 0) return;
+  const nb = neighbours(...rc(i));
+  const flagCount = nb.filter(j => flagged[j]).length;
+  if (flagCount !== counts[i]) return;
+
+  let hitMine = false;
+  nb.forEach(j => {
+    if (!revealed[j] && !flagged[j]) {
+      if (mines[j]) hitMine = true;
+      else reveal(j);
+    }
+  });
+  if (hitMine) {
+    // Find the wrong one and trigger lose
+    const wrongMine = nb.find(j => mines[j] && !flagged[j]);
+    if (wrongMine !== undefined) onLose(wrongMine);
+  } else {
+    checkWin();
+  }
+}
+
+function toggleFlagMode() {
+  flagMode = !flagMode;
+  qmarkMode = false;
+  document.getElementById('flag-btn').classList.toggle('active', flagMode);
+  document.getElementById('qmark-btn').classList.remove('active');
+}
+
+function toggleQmarkMode() {
+  qmarkMode = !qmarkMode;
+  flagMode = false;
+  document.getElementById('qmark-btn').classList.toggle('active', qmarkMode);
+  document.getElementById('flag-btn').classList.remove('active');
+}
+
+// ============================================================
+// WIN / LOSE
+// ============================================================
+function checkWin() {
+  const total = cfg.rows * cfg.cols;
+  const unrevealedSafe = Array.from({length: total}, (_, i) => i)
+    .filter(i => !mines[i] && !revealed[i]);
+  if (unrevealedSafe.length === 0) onWin();
+}
+
+function onWin() {
+  gameState = 'won';
+  stopTimer();
+
+  // Auto-flag remaining mines
+  mines.forEach((m, i) => { if (m && !flagged[i]) { flagged[i] = true; renderCell(i); } });
+  updateMineCounter();
+
+  // Save best time
+  const prev = bestTimes[difficulty];
+  const isNew = !prev || timerSec < prev;
+  if (isNew) {
+    bestTimes[difficulty] = timerSec;
+    localStorage.setItem('ms_best', JSON.stringify(bestTimes));
+  }
+
+  document.getElementById('end-title').textContent = 'YOU WIN';
+  document.getElementById('end-title').className   = 'end-title win';
+  document.getElementById('end-sub').textContent   = 'CLEARED · ' + difficulty.toUpperCase();
+  document.getElementById('end-time').textContent  = fmtTime(timerSec);
+  document.getElementById('end-best').textContent  = isNew ? '★ NEW BEST TIME' : '';
+  document.getElementById('end-overlay').classList.add('show');
+  renderLeaderboard();
+}
+
+function onLose(hitIdx) {
+  gameState = 'lost';
+  stopTimer();
+
+  // Reveal all mines
+  mines.forEach((m, i) => {
+    if (m) {
+      const cell = document.querySelector(`[data-idx="${i}"]`);
+      if (!cell) return;
+      if (i === hitIdx) {
+        cell.classList.add('mine-hit');
+        cell.textContent = '✸';
+      } else if (!flagged[i]) {
+        cell.classList.add('mine-revealed');
+        cell.textContent = '✸';
+      }
+    }
+  });
+  // Mark wrong flags
+  flagged.forEach((f, i) => {
+    if (f && !mines[i]) {
+      const cell = document.querySelector(`[data-idx="${i}"]`);
+      if (cell) { cell.classList.add('flag-wrong'); cell.textContent = '✗'; }
+    }
+  });
+
+  document.getElementById('end-title').textContent = 'BOOM';
+  document.getElementById('end-title').className   = 'end-title lose';
+  document.getElementById('end-sub').textContent   = 'GAME OVER';
+  document.getElementById('end-time').textContent  = fmtTime(timerSec);
+  document.getElementById('end-best').textContent  = '';
+  setTimeout(() => document.getElementById('end-overlay').classList.add('show'), 800);
+}
+
+function hideOverlay() {
+  document.getElementById('end-overlay').classList.remove('show');
+}
+
+// ============================================================
+// LEADERBOARD
+// ============================================================
+function renderLeaderboard() {
+  const lb = document.getElementById('leaderboard');
+  lb.innerHTML = ['easy','medium','hard'].map(d => {
+    const t = bestTimes[d];
+    return `<div class="lb-row">
+      <span class="lb-diff">${d}</span>
+      <span class="lb-time ${t ? '' : 'empty'}">${t ? fmtTime(t) : '--:--'}</span>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// DIFFICULTY
+// ============================================================
+function setDiff(d) {
+  difficulty = d;
+  cfg = CONFIGS[d];
+  document.querySelectorAll('.diff-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.diff === d));
+  newGame();
+}
+
+// ============================================================
+// NEW GAME
+// ============================================================
+function newGame() {
+  const total = cfg.rows * cfg.cols;
+  mines     = Array(total).fill(false);
+  counts    = Array(total).fill(0);
+  revealed  = Array(total).fill(false);
+  flagged   = Array(total).fill(false);
+  questioned = Array(total).fill(false);
+  gameState  = 'idle';
+  firstClick = true;
+  flagMode   = false;
+  qmarkMode  = false;
+  document.getElementById('flag-btn').classList.remove('active');
+  document.getElementById('qmark-btn').classList.remove('active');
+  resetTimer();
+  renderBoard();
+  renderLeaderboard();
+}
+
+// ============================================================
+// KEYBOARD: F = flag mode, Q = question mode, R = new game, S = solve step
+// ============================================================
+document.addEventListener('keydown', e => {
+  if (e.key === 'f' || e.key === 'F') toggleFlagMode();
+  if (e.key === 'q' || e.key === 'Q') toggleQmarkMode();
+  if (e.key === 'r' || e.key === 'R') newGame();
+  if (e.key === 's' || e.key === 'S') solveStep();
+});
+
+// ============================================================
+// STATUS MESSAGE
+// ============================================================
+let statusTimer = null;
+function showStatus(msg, type = 'info') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+// ============================================================
+// PROLOG SERVER
+// ============================================================
+const API = 'http://localhost:8082';
+let serverOnline = false;
+
+async function checkServer() {
+  try {
+    const res = await fetch(API + '/analyse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ board: Array(9).fill(-2), rows: 3, cols: 3 }),
+      signal: AbortSignal.timeout(2000),
+    });
+    serverOnline = res.ok;
+  } catch (e) {
+    serverOnline = false;
+  }
+
+  const dot   = document.getElementById('server-dot');
+  const label = document.getElementById('server-label');
+  if (serverOnline) {
+    dot.className     = 'server-dot online';
+    label.textContent = 'Prolog online';
+  } else {
+    dot.className     = 'server-dot';
+    label.textContent = 'Prolog offline';
+  }
+  console.log('[Server] online:', serverOnline);
+}
+
+// ============================================================
+// BUILD BOARD ARRAY FOR PROLOG
+// Encoding: -2 unrevealed, -1 flagged, 0 empty revealed, 1-8 numbered
+// ============================================================
+function buildPrologBoard() {
+  const total = cfg.rows * cfg.cols;
+  return Array.from({ length: total }, (_, i) => {
+    if (flagged[i])   return -1;
+    if (!revealed[i]) return -2;
+    return counts[i]; // 0–8
+  });
+}
+
+// ============================================================
+// SOLVE STEP
+// Asks Prolog to deduce safe cells and definite mines.
+// Highlights them; on second press (or if server offline) acts on them.
+// ============================================================
+let lastHints = null; // { safe: [], mines: [] }
+
+async function solveStep() {
+  if (gameState === 'idle') {
+    showStatus('Start the game first — click any cell', 'warn');
+    return;
+  }
+  if (gameState === 'won' || gameState === 'lost') return;
+
+  clearHints();
+
+  // Always compute local deductions first so we have a fallback ready
+  const { safe, mines: mineCells } = localDeduce();
+  console.log('[Solver] localDeduce → safe:', safe, 'mines:', mineCells);
+  console.log('[Solver] serverOnline:', serverOnline);
+
+  if (serverOnline) {
+    showStatus('Prolog analysing…', 'info');
+    try {
+      const board = buildPrologBoard();
+      const res = await fetch(API + '/analyse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ board, rows: cfg.rows, cols: cfg.cols }),
+      });
+      const data = await res.json();
+      console.log('[Solver] Prolog response:', data);
+
+      if (data.success) {
+        // Merge Prolog results with local deduction (union of both)
+        const mergedSafe  = [...new Set([...data.safe,  ...safe])];
+        const mergedMines = [...new Set([...data.mines, ...mineCells])];
+        // Remove conflicts
+        const finalSafe  = mergedSafe.filter(i  => !mergedMines.includes(i));
+        const finalMines = mergedMines.filter(i => !mergedSafe.includes(i));
+        if (finalSafe.length > 0 || finalMines.length > 0) {
+          applyHints(finalSafe, finalMines);
+          return;
+        }
+      }
+      // Fall through to local only
+    } catch (e) {
+      console.warn('[Solver] Prolog fetch failed:', e);
+    }
+  }
+
+  // Local deduction
+  if (safe.length === 0 && mineCells.length === 0) {
+    showStatus('No certain deductions possible right now', 'warn');
+  } else {
+    applyHints(safe, mineCells);
+  }
+}
+
+// Highlight cells and then auto-act after 1.5 s
+function applyHints(safeCells, mineCells) {
+  lastHints = { safe: safeCells, mines: mineCells };
+
+  safeCells.forEach(i => {
+    document.querySelector(`[data-idx="${i}"]`)?.classList.add('safe-hint');
+  });
+  mineCells.forEach(i => {
+    document.querySelector(`[data-idx="${i}"]`)?.classList.add('mine-hint');
+  });
+
+  const s = safeCells.length, m = mineCells.length;
+  showStatus(
+    `⬡ ${s} safe cell${s!==1?'s':''} · ${m} mine${m!==1?'s':''} identified — acting in 1.5s`,
+    'info'
+  );
+
+  setTimeout(() => {
+    clearHints();
+    // Reveal safe cells
+    safeCells.forEach(i => {
+      if (!revealed[i] && !flagged[i]) reveal(i);
+    });
+    // Flag mines
+    mineCells.forEach(i => {
+      if (!revealed[i]) { flagged[i] = true; questioned[i] = false; renderCell(i); }
+    });
+    updateMineCounter();
+    checkWin();
+    lastHints = null;
+  }, 1500);
+}
+
+function clearHints() {
+  document.querySelectorAll('.safe-hint, .mine-hint').forEach(el => {
+    el.classList.remove('safe-hint', 'mine-hint');
+  });
+}
+
+// ============================================================
+// LOCAL DEDUCTION — reads game state directly
+// For each revealed numbered cell:
+//   remaining = count - number of flagged neighbours
+//   unrevealed = unrevealed unflagged neighbours
+//   if remaining == 0              → all unrevealed neighbours are safe
+//   if remaining == unrevealed.length → all unrevealed neighbours are mines
+// ============================================================
+function localDeduce() {
+  const safeSet = new Set();
+  const mineSet = new Set();
+  const total   = cfg.rows * cfg.cols;
+
+  for (let i = 0; i < total; i++) {
+    // Only process revealed, non-mine, numbered cells
+    if (!revealed[i]) continue;
+    if (mines[i])     continue;
+    if (counts[i] === 0) continue;
+
+    const r = Math.floor(i / cfg.cols);
+    const c = i % cfg.cols;
+    const nbs = [];
+    for (let dr = -1; dr <= 1; dr++)
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < cfg.rows && nc >= 0 && nc < cfg.cols)
+          nbs.push(nr * cfg.cols + nc);
+      }
+
+    const flaggedNbs    = nbs.filter(j => flagged[j]);
+    const unrevealedNbs = nbs.filter(j => !revealed[j] && !flagged[j]);
+    const remaining     = counts[i] - flaggedNbs.length;
+
+    if (remaining === 0) {
+      unrevealedNbs.forEach(j => safeSet.add(j));
+    } else if (remaining === unrevealedNbs.length) {
+      unrevealedNbs.forEach(j => mineSet.add(j));
+    }
+  }
+
+  // If somehow deduced both ways, drop those cells
+  const safeFinal = [...safeSet].filter(i => !mineSet.has(i));
+  const mineFinal = [...mineSet].filter(i => !safeSet.has(i));
+
+  return { safe: safeFinal, mines: mineFinal };
+}
+
+// ============================================================
+// INIT
+// ============================================================
+try {
+  checkServer();
+  newGame();
+  console.log('[MS] Init complete.');
+} catch(e) {
+  console.error('[MS] Init failed:', e);
+  alert('JS Error on load: ' + e.message);
+}
+</script>
+</body>
+</html>
