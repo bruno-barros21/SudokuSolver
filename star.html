@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STAR BATTLE — Prolog Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:ital,wght@0,300;0,700;0,900;1,300;1,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0b0b0f;
+    --surface:   #14141a;
+    --border:    #252530;
+    --accent:    #f5d03a;   /* gold star */
+    --accent2:   #f58c3a;   /* orange */
+    --hint-col:  #3ab8f5;
+    --solved-col:#3af5a0;
+    --wrong:     #f53a50;
+    --muted:     #555566;
+    --text:      #d0d0e0;
+    --given:     #e8e8f8;
+    --cell-size: clamp(38px, 7.5vw, 58px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+  }
+
+  /* starfield background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 12% 18%, rgba(245,208,58,0.55) 0%, transparent 100%),
+      radial-gradient(1px 1px at 43% 8%,  rgba(245,208,58,0.40) 0%, transparent 100%),
+      radial-gradient(1px 1px at 67% 31%, rgba(245,208,58,0.35) 0%, transparent 100%),
+      radial-gradient(1px 1px at 85% 12%, rgba(245,208,58,0.50) 0%, transparent 100%),
+      radial-gradient(1px 1px at 23% 55%, rgba(245,208,58,0.30) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 64%, rgba(245,208,58,0.45) 0%, transparent 100%),
+      radial-gradient(1px 1px at 5%  78%, rgba(245,208,58,0.35) 0%, transparent 100%),
+      radial-gradient(1px 1px at 55% 82%, rgba(245,208,58,0.25) 0%, transparent 100%),
+      radial-gradient(1px 1px at 76% 90%, rgba(245,208,58,0.40) 0%, transparent 100%),
+      radial-gradient(1px 1px at 34% 95%, rgba(245,208,58,0.30) 0%, transparent 100%),
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size:
+      100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%,
+      100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%,
+      44px 44px, 44px 44px;
+    opacity: 0.4;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 960px;
+    padding: 32px 24px 8px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .logo {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(32px, 6.5vw, 60px);
+    font-weight: 900;
+    letter-spacing: -2px;
+    line-height: 1;
+    color: var(--given);
+  }
+  .logo .star-gold { color: var(--accent); }
+
+  .subtitle {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding-top: 6px;
+  }
+
+  /* ── PUZZLE SIZE BAR ── */
+  .size-bar {
+    position: relative; z-index: 1;
+    display: flex; gap: 6px;
+    padding: 12px 0 4px;
+  }
+
+  .size-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .size-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .size-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 700;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 960px;
+    padding: 0 24px 48px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 32px;
+    align-items: start;
+  }
+  @media (max-width: 700px) {
+    main { grid-template-columns: 1fr; }
+    .side-panel { padding-top: 8px; flex-direction: row; flex-wrap: wrap; }
+    .side-panel .divider { display: none; }
+    .action-btn { flex: 1; min-width: 120px; }
+  }
+
+  /* ── BOARD ── */
+  .board-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  #board {
+    display: grid;
+    position: relative;
+    border: 2.5px solid var(--given);
+  }
+
+  /* cells */
+  .cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(18px, 3.8vw, 30px);
+    cursor: pointer;
+    position: relative;
+    transition: background 0.12s;
+    user-select: none;
+    outline: none;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .cell:hover { background: #1c1c25; }
+  .cell.starred { color: var(--accent); }
+  .cell.starred::after {
+    content: '★';
+    font-size: inherit;
+    animation: starPop 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .cell.hint-star { color: var(--hint-col) !important; }
+  .cell.hint-star::after { content: '★'; }
+  .cell.solved-star { color: var(--solved-col) !important; }
+  .cell.solved-star::after { content: '★'; }
+  .cell.marked::before {
+    content: '✕';
+    font-size: calc(var(--cell-size) * 0.28);
+    color: var(--muted);
+    opacity: 0.6;
+  }
+  .cell.error-flash { animation: errShake 0.3s; background: rgba(245,58,80,0.15) !important; }
+
+  /* region thick borders applied via JS */
+  .cell.border-top    { border-top-color:    var(--given) !important; border-top-width:    2px !important; }
+  .cell.border-bottom { border-bottom-color: var(--given) !important; border-bottom-width: 2px !important; }
+  .cell.border-left   { border-left-color:   var(--given) !important; border-left-width:   2px !important; }
+  .cell.border-right  { border-right-color:  var(--given) !important; border-right-width:  2px !important; }
+
+  @keyframes starPop {
+    0%   { transform: scale(0.4) rotate(-20deg); opacity: 0; }
+    100% { transform: scale(1)   rotate(0deg);   opacity: 1; }
+  }
+  @keyframes errShake {
+    0%,100% { transform: translateX(0); }
+    25%     { transform: translateX(-4px); }
+    75%     { transform: translateX(4px); }
+  }
+
+  /* region colour tints – 10 palette entries (enough for up to 10×10) */
+  .r0  { background: #14141a; }
+  .r1  { background: #161420; }
+  .r2  { background: #141820; }
+  .r3  { background: #161a14; }
+  .r4  { background: #1a1414; }
+  .r5  { background: #191519; }
+  .r6  { background: #141a18; }
+  .r7  { background: #1a1814; }
+  .r8  { background: #14181a; }
+  .r9  { background: #1a1418; }
+  .r0:hover  { background: #1c1c25; }
+  .r1:hover  { background: #1e1c2a; }
+  .r2:hover  { background: #1c202a; }
+  .r3:hover  { background: #1e221c; }
+  .r4:hover  { background: #221c1c; }
+  .r5:hover  { background: #211d21; }
+  .r6:hover  { background: #1c2220; }
+  .r7:hover  { background: #22201c; }
+  .r8:hover  { background: #1c201e; }  /* slight fix */
+  .r9:hover  { background: #221c20; }
+
+  /* ── COUNTERS ── */
+  .counters {
+    display: flex;
+    gap: 20px;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .counter-val { color: var(--accent); font-weight: 700; font-size: 18px; }
+
+  /* ── LEGEND ── */
+  .legend {
+    display: flex;
+    gap: 16px;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    align-items: center;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-icon { font-size: 13px; }
+
+  /* ── SIDE PANEL ── */
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 40px;
+    min-width: 180px;
+  }
+
+  .action-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 13px 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  .action-btn::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    transform: scaleY(0);
+    transition: transform 0.2s;
+  }
+  .action-btn:hover::before  { transform: scaleY(1); }
+  .action-btn:hover { border-color: var(--accent); color: var(--accent); padding-left: 22px; }
+
+  .action-btn.hint-btn::before   { background: var(--hint-col); }
+  .action-btn.hint-btn:hover     { border-color: var(--hint-col); color: var(--hint-col); }
+  .action-btn.solve-btn::before  { background: var(--solved-col); }
+  .action-btn.solve-btn:hover    { border-color: var(--solved-col); color: var(--solved-col); }
+  .action-btn.verify-btn::before { background: var(--accent2); }
+  .action-btn.verify-btn:hover   { border-color: var(--accent2); color: var(--accent2); }
+  .action-btn.clear-btn::before  { background: var(--wrong); }
+  .action-btn.clear-btn:hover    { border-color: var(--wrong); color: var(--wrong); }
+  .action-btn.new-btn::before    { background: var(--muted); }
+
+  /* verify cell highlights */
+  .cell.verify-ok  { box-shadow: inset 0 0 0 2px var(--solved-col); }
+  .cell.verify-bad { box-shadow: inset 0 0 0 2px var(--wrong); animation: errShake 0.35s; }
+
+  .btn-icon { font-size: 15px; flex-shrink: 0; }
+
+  .divider { height: 1px; background: var(--border); margin: 2px 0; }
+
+  /* star counter for side panel */
+  .star-tally {
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    padding: 8px 0 0;
+    line-height: 1.8;
+  }
+  .tally-label { color: var(--accent); font-weight: 600; }
+
+  /* ── STATUS ── */
+  #status {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 11px 22px;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+    opacity: 0;
+    z-index: 100;
+    white-space: nowrap;
+  }
+  #status.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  #status.success { border-color: var(--solved-col); color: var(--solved-col); }
+  #status.error   { border-color: var(--wrong);      color: var(--wrong); }
+  #status.info    { border-color: var(--hint-col);   color: var(--hint-col); }
+  #status.warn    { border-color: var(--accent);     color: var(--accent); }
+
+  /* ── WIN OVERLAY ── */
+  #win-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(11,11,15,0.93);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+  }
+  #win-overlay.show { display: flex; }
+  .win-stars {
+    font-size: 60px;
+    letter-spacing: 12px;
+    animation: winFloat 1.2s ease infinite alternate;
+  }
+  .win-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(50px, 10vw, 88px);
+    font-weight: 900;
+    color: var(--accent);
+    letter-spacing: -3px;
+    animation: winPop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .win-sub  { color: var(--muted); font-size: 12px; letter-spacing: 4px; text-transform: uppercase; }
+  .win-time { color: var(--accent2); font-size: 36px; letter-spacing: 6px; font-variant-numeric: tabular-nums; }
+  @keyframes winPop {
+    0%   { transform: scale(0.5) rotate(-6deg); opacity: 0; }
+    100% { transform: scale(1)   rotate(0deg);  opacity: 1; }
+  }
+  @keyframes winFloat {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-8px); }
+  }
+
+  /* ── SERVER BADGE ── */
+  .server-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--muted); padding: 0 24px;
+  }
+  .server-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--wrong);
+  }
+  .server-dot.online { background: var(--solved-col); }
+
+  /* ── TIMER ── */
+  .timer {
+    font-size: 26px;
+    letter-spacing: 4px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">STAR<span class="star-gold"> ★ </span>BATTLE</div>
+    <div class="subtitle">Powered by SWI-Prolog</div>
+  </div>
+  <div style="text-align:right">
+    <div class="timer" id="timer">00:00</div>
+  </div>
+</header>
+
+<div style="position:relative;z-index:1;width:100%;max-width:960px;padding:0 24px;">
+  <div class="size-bar">
+    <button class="size-btn active" data-size="5">5×5 · 1★</button>
+    <button class="size-btn" data-size="6">6×6 · 1★</button>
+    <button class="size-btn" data-size="7">7×7 · 1★</button>
+    <button class="size-btn" data-size="8">8×8 · 1★</button>
+  </div>
+  <div class="server-badge">
+    <div class="server-dot" id="server-dot"></div>
+    <span id="server-label">Prolog — offline (local mode)</span>
+  </div>
+</div>
+
+<main>
+  <div class="board-wrap">
+    <div id="board"></div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="legend-icon" style="color:var(--accent)">★</span> Star</div>
+      <div class="legend-item"><span class="legend-icon" style="color:var(--muted)">✕</span> Eliminated</div>
+      <div class="legend-item"><span style="font-size:9px">Left-click: cycle ·</span></div>
+      <div class="legend-item"><span style="font-size:9px">Right-click: mark ✕</span></div>
+    </div>
+
+    <div class="counters">
+      <div>
+        <div class="counter-val" id="cnt-stars">0</div>
+        <div>stars placed</div>
+      </div>
+      <div>
+        <div class="counter-val" id="cnt-needed">0</div>
+        <div>stars needed</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side-panel">
+    <button class="action-btn new-btn" id="btn-new">
+      <span class="btn-icon">⚡</span> New Puzzle
+    </button>
+    <div class="divider"></div>
+    <button class="action-btn verify-btn" id="btn-verify">
+      <span class="btn-icon">✓</span> Verify
+    </button>
+    <button class="action-btn hint-btn" id="btn-hint">
+      <span class="btn-icon">◈</span> Hint
+    </button>
+    <button class="action-btn solve-btn" id="btn-solve">
+      <span class="btn-icon">∞</span> Solve
+    </button>
+    <div class="divider"></div>
+    <button class="action-btn clear-btn" id="btn-clear">
+      <span class="btn-icon">✕</span> Clear Board
+    </button>
+    <div class="star-tally" id="tally"></div>
+  </div>
+</main>
+
+<div id="win-overlay">
+  <div class="win-stars">★ ★ ★</div>
+  <div class="win-title">SOLVED!</div>
+  <div class="win-time" id="win-time">00:00</div>
+  <div class="win-sub">Puzzle complete</div>
+  <br>
+  <button class="action-btn new-btn" id="win-new">
+    <span class="btn-icon">⚡</span> Play Again
+  </button>
+</div>
+
+<div id="status"></div>
+
+<script>
+
+// ============================================================
+// PROLOG SERVER CONNECTION
+// ============================================================
+const API_CANDIDATES = (() => {
+  const list = [];
+  // Best option: when star.html is opened from the Prolog server itself.
+  if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+    list.push(window.location.origin);
+  }
+  // Fallbacks for when star.html is opened directly as a local file.
+  list.push('http://127.0.0.1:8081');
+  list.push('http://localhost:8081');
+  return [...new Set(list)];
+})();
+let API = API_CANDIDATES[0];
+let serverOnline = false;
+
+async function checkServer() {
+  serverOnline = false;
+  for (const candidate of API_CANDIDATES) {
+    try {
+      const res = await fetch(candidate + '/status', { signal: AbortSignal.timeout(1500) });
+      if (res.ok) {
+        API = candidate;
+        serverOnline = true;
+        break;
+      }
+    } catch (_) {}
+  }
+  const dot = document.getElementById('server-dot');
+  const label = document.getElementById('server-label');
+  if (dot) dot.className = 'server-dot' + (serverOnline ? ' online' : '');
+  if (label) label.textContent = serverOnline ? 'Prolog — online' : 'Prolog — offline (JS fallback)';
+}
+
+async function generateWithProlog(sizeKey) {
+  const n = Number(sizeKey);
+  const res = await fetch(API + '/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ n })
+  });
+  if (!res.ok) throw new Error('Prolog generator did not respond');
+  const data = await res.json();
+  if (!data.success || !Array.isArray(data.regions) || !Array.isArray(data.solution)) {
+    throw new Error(data.error || 'Prolog could not generate this puzzle');
+  }
+  return data;
+}
+
+async function solveWithProlog(n, stars, regions) {
+  const res = await fetch(API + '/solve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ n, stars, regions })
+  });
+  if (!res.ok) throw new Error('Prolog server did not respond');
+  const data = await res.json();
+  if (!data.success || !Array.isArray(data.solution)) {
+    throw new Error(data.error || 'Prolog could not solve this puzzle');
+  }
+  return data.solution;
+}
+
+async function verifyWithProlog() {
+  const res = await fetch(API + '/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ n: N, stars: STARS, regions: REGIONS, current: board })
+  });
+  if (!res.ok) throw new Error('Prolog server did not respond');
+  return await res.json();
+}
+
+async function hintWithProlog() {
+  const res = await fetch(API + '/hint', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ n: N, stars: STARS, regions: REGIONS, current: board })
+  });
+  if (!res.ok) throw new Error('Prolog server did not respond');
+  return await res.json();
+}
+
+// ============================================================
+// PUZZLE LIBRARY
+// ============================================================
+// Each puzzle: { n, stars, regions }
+// regions: n×n array of region IDs (0-indexed integers)
+// ============================================================
+
+const PUZZLES = {
+  5: [
+    // 5×5 — 1 star per row/col/region
+    {
+      n: 5, stars: 1,
+      regions: [
+        [0,0,1,2,2],
+        [0,1,1,2,2],
+        [0,1,3,3,2],
+        [0,4,3,3,2],
+        [4,4,4,3,3]
+      ]
+    },
+    {
+      n: 5, stars: 1,
+      regions: [
+        [0,0,0,1,1],
+        [0,2,0,1,1],
+        [2,2,3,3,1],
+        [2,4,4,3,1],
+        [2,4,4,3,3]
+      ]
+    },
+    {
+      n: 5, stars: 1,
+      regions: [
+        [0,0,1,1,1],
+        [0,2,2,1,3],
+        [0,2,4,3,3],
+        [0,2,4,4,3],
+        [0,0,4,4,3]
+      ]
+    }
+  ],
+  6: [
+    // 6×6 — 1 star per row/col/region
+    {
+      n: 6, stars: 1,
+      regions: [
+        [0,0,1,1,2,2],
+        [0,0,1,1,2,2],
+        [3,3,1,1,4,4],
+        [3,3,5,5,4,4],
+        [3,3,5,5,4,4],
+        [3,3,5,5,4,4]
+      ]
+    },
+    {
+      n: 6, stars: 1,
+      regions: [
+        [0,0,1,1,2,2],
+        [0,3,1,1,2,2],
+        [0,3,3,4,4,2],
+        [0,3,3,4,4,5],
+        [0,0,3,4,5,5],
+        [0,0,4,4,5,5]
+      ]
+    },
+    {
+      n: 6, stars: 1,
+      regions: [
+        [0,0,0,1,1,1],
+        [0,2,2,2,1,3],
+        [0,2,4,2,3,3],
+        [0,4,4,2,3,5],
+        [4,4,2,2,3,5],
+        [4,4,5,5,5,5]
+      ]
+    }
+  ],
+  7: [
+    // 7×7 — 1 star per row/col/region
+    {
+      n: 7, stars: 1,
+      regions: [
+        [0,0,1,1,2,2,2],
+        [0,0,1,1,2,2,2],
+        [0,0,1,1,3,3,3],
+        [0,0,4,4,3,3,3],
+        [5,5,4,4,3,3,3],
+        [5,5,4,4,6,6,6],
+        [5,5,4,4,6,6,6]
+      ]
+    },
+    {
+      n: 7, stars: 1,
+      regions: [
+        [0,0,0,1,1,1,1],
+        [0,2,2,2,1,3,3],
+        [0,2,4,2,3,3,3],
+        [0,2,4,4,4,3,3],
+        [5,5,4,4,6,6,3],
+        [5,5,5,6,6,6,6],
+        [5,5,5,5,6,6,6]
+      ]
+    },
+    {
+      n: 7, stars: 1,
+      regions: [
+        [0,0,0,0,1,1,1],
+        [0,0,2,2,2,1,1],
+        [3,3,2,2,4,4,1],
+        [3,3,3,2,4,4,4],
+        [3,5,5,2,2,6,4],
+        [3,5,5,5,6,6,6],
+        [5,5,5,6,6,6,6]
+      ]
+    }
+  ],
+  8: [
+    // 8×8 — 1 star per row/col/region
+    {
+      n: 8, stars: 1,
+      regions: [
+        [0,0,1,1,1,2,2,2],
+        [0,0,1,1,1,2,2,2],
+        [0,0,1,1,3,3,2,2],
+        [0,0,4,4,3,3,2,2],
+        [0,0,4,4,3,3,5,5],
+        [6,6,4,4,3,3,5,5],
+        [6,6,7,7,3,3,5,5],
+        [6,6,7,7,7,7,5,5]
+      ]
+    },
+    {
+      n: 8, stars: 1,
+      regions: [
+        [0,0,0,1,1,1,2,2],
+        [0,0,1,1,1,2,2,2],
+        [0,3,3,1,4,4,2,2],
+        [0,3,3,3,4,4,4,5],
+        [3,3,3,6,4,4,5,5],
+        [3,7,7,6,6,4,5,5],
+        [7,7,7,6,6,6,5,5],
+        [7,7,6,6,6,6,5,5]
+      ]
+    },
+    {
+      n: 8, stars: 1,
+      regions: [
+        [0,0,0,0,1,1,1,1],
+        [0,2,2,2,2,1,3,1],
+        [0,2,4,4,2,3,3,3],
+        [0,4,4,5,5,3,3,6],
+        [0,4,5,5,5,6,6,6],
+        [4,4,5,7,7,7,6,6],
+        [4,7,7,7,7,7,6,6],
+        [4,4,7,7,7,6,6,6]
+      ]
+    }
+  ]
+};
+
+// ============================================================
+// SOLVER (JS port of the Prolog backtracking logic)
+// ============================================================
+
+function solvePuzzle(n, stars, regions) {
+  // board: flat array of n*n, values: 0=empty, 1=star
+  const board = new Array(n * n).fill(0);
+  const regionOf = (r, c) => regions[r][c];
+
+  // Collect region IDs
+  const regionIds = [...new Set(regions.flat())];
+
+  function getRowStars(board, row) {
+    let count = 0;
+    for (let c = 0; c < n; c++) if (board[row * n + c] === 1) count++;
+    return count;
+  }
+  function getColStars(board, col) {
+    let count = 0;
+    for (let r = 0; r < n; r++) if (board[r * n + col] === 1) count++;
+    return count;
+  }
+  function getRegionStars(board, regId) {
+    let count = 0;
+    for (let r = 0; r < n; r++)
+      for (let c = 0; c < n; c++)
+        if (regions[r][c] === regId && board[r * n + c] === 1) count++;
+    return count;
+  }
+
+  // Check king-adjacency between two cells
+  function adjacent(r1, c1, r2, c2) {
+    return Math.abs(r1 - r2) <= 1 && Math.abs(c1 - c2) <= 1 && !(r1 === r2 && c1 === c2);
+  }
+
+  // Stars placed so far (as [r,c] pairs)
+  let placed = [];
+
+  function isAdjacentToAny(r, c) {
+    for (const [pr, pc] of placed)
+      if (adjacent(r, c, pr, pc)) return true;
+    return false;
+  }
+
+  // Row-by-row backtracking
+  // Pick which 'stars' cells in a row become stars
+  function combinations(arr, k) {
+    if (k === 0) return [[]];
+    if (arr.length < k) return [];
+    const [first, ...rest] = arr;
+    const withFirst = combinations(rest, k - 1).map(c => [first, ...c]);
+    const withoutFirst = combinations(rest, k);
+    return [...withFirst, ...withoutFirst];
+  }
+
+  function solve(row) {
+    if (row === n) {
+      // Check all columns and regions have exactly 'stars' each
+      for (let c = 0; c < n; c++)
+        if (getColStars(board, c) !== stars) return false;
+      for (const rid of regionIds)
+        if (getRegionStars(board, rid) !== stars) return false;
+      return true;
+    }
+
+    // Generate all ways to choose 'stars' columns for this row
+    const cols = Array.from({length: n}, (_, i) => i);
+    const choices = combinations(cols, stars);
+
+    for (const chosen of choices) {
+      // Place stars
+      for (const c of chosen) board[row * n + c] = 1;
+
+      let valid = true;
+
+      // Check row adjacency among chosen columns
+      for (let i = 0; i < chosen.length && valid; i++)
+        for (let j = i + 1; j < chosen.length && valid; j++)
+          if (Math.abs(chosen[i] - chosen[j]) <= 1) valid = false;
+
+      // Check adjacency with previously placed stars
+      if (valid) {
+        for (const c of chosen) {
+          if (isAdjacentToAny(row, c)) { valid = false; break; }
+        }
+      }
+
+      // Check columns "at most stars" so far
+      if (valid) {
+        for (const c of chosen) {
+          if (getColStars(board, c) > stars) { valid = false; break; }
+        }
+      }
+
+      // Check regions "at most stars" so far
+      if (valid) {
+        for (const rid of regionIds) {
+          if (getRegionStars(board, rid) > stars) { valid = false; break; }
+        }
+      }
+
+      if (valid) {
+        for (const c of chosen) placed.push([row, c]);
+        if (solve(row + 1)) return true;
+        for (const c of chosen) placed.pop();
+      }
+
+      // Un-place
+      for (const c of chosen) board[row * n + c] = 0;
+    }
+
+    return false;
+  }
+
+  if (solve(0)) return board;
+  return null;
+}
+
+// ============================================================
+// PUZZLE GENERATOR — picks a random puzzle from the library
+// or generates a shuffled variant
+// ============================================================
+function pickPuzzle(sizeKey) {
+  const pool = PUZZLES[sizeKey];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let N        = 5;
+let STARS    = 1;
+let REGIONS  = [];   // 2D array
+let SOLUTION = [];   // flat: 1=star, 0=empty
+let board    = [];   // flat: 0=empty, 1=star, 2=marked(X)
+let timerSec = 0;
+let timerInt = null;
+let currentSize = '5';
+let solved   = false;
+
+// ============================================================
+// TIMER
+// ============================================================
+function startTimer() {
+  timerInt = setInterval(() => {
+    timerSec++;
+    document.getElementById('timer').textContent = formatTime(timerSec);
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerInt); }
+function resetTimer() { stopTimer(); timerSec = 0; document.getElementById('timer').textContent = '00:00'; }
+function formatTime(s) {
+  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
+
+// ============================================================
+// NEW GAME
+// ============================================================
+async function newGame() {
+  solved = false;
+  document.getElementById('win-overlay').classList.remove('show');
+  showStatus('Generating fresh puzzle with Prolog…', 'info');
+
+  await checkServer();
+
+  try {
+    if (!serverOnline) throw new Error('Prolog server offline');
+
+    const generated = await generateWithProlog(currentSize);
+    N = generated.n;
+    STARS = generated.stars;
+    REGIONS = generated.regions;
+    SOLUTION = generated.solution;
+    board = new Array(N * N).fill(0);
+
+    showStatus('Fresh puzzle generated by Prolog', 'success');
+  } catch (err) {
+    console.warn(err);
+
+    // Emergency fallback only: if the Prolog server is not reachable, keep the app usable.
+    const puz = pickPuzzle(currentSize);
+    N = puz.n; STARS = puz.stars; REGIONS = puz.regions;
+    board = new Array(N * N).fill(0);
+    SOLUTION = solvePuzzle(N, STARS, REGIONS);
+    showStatus('Prolog unavailable — using built-in fallback puzzle', 'warn');
+  }
+
+  resetTimer();
+  startTimer();
+  renderBoard();
+  updateCounters();
+  updateTally();
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderBoard() {
+  const el = document.getElementById('board');
+  el.style.gridTemplateColumns = `repeat(${N}, var(--cell-size))`;
+  el.style.gridTemplateRows    = `repeat(${N}, var(--cell-size))`;
+  el.innerHTML = '';
+
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      const idx = r * N + c;
+      const rid = REGIONS[r][c];
+
+      const cell = document.createElement('div');
+      cell.className = `cell r${rid % 10}`;
+      cell.dataset.idx = idx;
+      cell.dataset.row = r;
+      cell.dataset.col = c;
+
+      // Region thick borders
+      if (r === 0 || REGIONS[r-1][c] !== rid) cell.classList.add('border-top');
+      if (r === N-1 || REGIONS[r+1][c] !== rid) cell.classList.add('border-bottom');
+      if (c === 0 || REGIONS[r][c-1] !== rid) cell.classList.add('border-left');
+      if (c === N-1 || REGIONS[r][c+1] !== rid) cell.classList.add('border-right');
+
+      if (board[idx] === 1) cell.classList.add('starred');
+      if (board[idx] === 2) cell.classList.add('marked');
+
+      cell.addEventListener('click',       () => cellClick(idx));
+      cell.addEventListener('contextmenu', e => { e.preventDefault(); cellRightClick(idx); });
+
+      el.appendChild(cell);
+    }
+  }
+}
+
+function refreshCell(idx) {
+  const cell = document.querySelector(`.cell[data-idx="${idx}"]`);
+  if (!cell) return;
+  cell.classList.remove('starred','marked','hint-star','solved-star','error-flash');
+  if (board[idx] === 1) cell.classList.add('starred');
+  if (board[idx] === 2) cell.classList.add('marked');
+}
+
+// ============================================================
+// INTERACTION
+// ============================================================
+// Left click: cycle  empty → star → empty
+// Right click: toggle mark (X)
+function cellClick(idx) {
+  if (solved) return;
+  if (board[idx] === 2) { board[idx] = 0; }       // marked → clear
+  else if (board[idx] === 1) { board[idx] = 0; }   // star → clear
+  else { board[idx] = 1; }                          // empty → star
+
+  // Immediate constraint flash
+  if (board[idx] === 1) {
+    const [r, c] = [Math.floor(idx/N), idx % N];
+    if (!checkCell(r, c)) {
+      flashError(idx);
+    }
+  }
+
+  refreshCell(idx);
+  updateCounters();
+  updateTally();
+  checkWin();
+}
+
+function cellRightClick(idx) {
+  if (solved) return;
+  if (board[idx] === 1) return; // don't mark over a star
+  board[idx] = board[idx] === 2 ? 0 : 2;
+  refreshCell(idx);
+}
+
+// Returns false if placing a star at (r,c) violates constraints
+function checkCell(r, c) {
+  // Row count
+  let rowCount = 0;
+  for (let cc = 0; cc < N; cc++) if (board[r*N+cc] === 1) rowCount++;
+  if (rowCount > STARS) return false;
+
+  // Col count
+  let colCount = 0;
+  for (let rr = 0; rr < N; rr++) if (board[rr*N+c] === 1) colCount++;
+  if (colCount > STARS) return false;
+
+  // Region count
+  const rid = REGIONS[r][c];
+  let regCount = 0;
+  for (let rr = 0; rr < N; rr++)
+    for (let cc = 0; cc < N; cc++)
+      if (REGIONS[rr][cc] === rid && board[rr*N+cc] === 1) regCount++;
+  if (regCount > STARS) return false;
+
+  // Adjacency
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < N && nc >= 0 && nc < N) {
+        if (board[nr*N+nc] === 1) return false;
+      }
+    }
+  }
+  return true;
+}
+
+function flashError(idx) {
+  const cell = document.querySelector(`.cell[data-idx="${idx}"]`);
+  if (!cell) return;
+  cell.classList.add('error-flash');
+  setTimeout(() => cell.classList.remove('error-flash'), 350);
+}
+
+// ============================================================
+// COUNTERS + TALLY
+// ============================================================
+function updateCounters() {
+  const placed = board.filter(v => v === 1).length;
+  const needed = N * STARS;
+  document.getElementById('cnt-stars').textContent  = placed;
+  document.getElementById('cnt-needed').textContent = needed;
+}
+
+function updateTally() {
+  const lines = [];
+  // per-row
+  const rowOk = [];
+  for (let r = 0; r < N; r++) {
+    let cnt = 0;
+    for (let c = 0; c < N; c++) if (board[r*N+c] === 1) cnt++;
+    rowOk.push(cnt === STARS ? '✓' : `${cnt}/${STARS}`);
+  }
+  lines.push('<span class="tally-label">Rows:</span> ' + rowOk.join(' '));
+
+  // per-col
+  const colOk = [];
+  for (let c = 0; c < N; c++) {
+    let cnt = 0;
+    for (let r = 0; r < N; r++) if (board[r*N+c] === 1) cnt++;
+    colOk.push(cnt === STARS ? '✓' : `${cnt}/${STARS}`);
+  }
+  lines.push('<span class="tally-label">Cols:</span> ' + colOk.join(' '));
+
+  // per-region
+  const rids = [...new Set(REGIONS.flat())].sort((a,b) => a-b);
+  const regOk = rids.map(rid => {
+    let cnt = 0;
+    for (let r = 0; r < N; r++)
+      for (let c = 0; c < N; c++)
+        if (REGIONS[r][c] === rid && board[r*N+c] === 1) cnt++;
+    return cnt === STARS ? '✓' : `${cnt}/${STARS}`;
+  });
+  lines.push('<span class="tally-label">Regs:</span> ' + regOk.join(' '));
+
+  document.getElementById('tally').innerHTML = lines.join('<br>');
+}
+
+// ============================================================
+// WIN CHECK
+// ============================================================
+function checkWin() {
+  if (!SOLUTION) return;
+  const placed = board.filter(v => v === 1).length;
+  if (placed !== N * STARS) return;
+
+  // Compare to solution
+  for (let i = 0; i < N * N; i++) {
+    if ((board[i] === 1) !== (SOLUTION[i] === 1)) return;
+  }
+
+  solved = true;
+  stopTimer();
+  document.getElementById('win-time').textContent = formatTime(timerSec);
+  setTimeout(() => {
+    document.getElementById('win-overlay').classList.add('show');
+  }, 400);
+}
+
+// ============================================================
+// VERIFY — highlight correct / incorrect star placements
+// ============================================================
+async function verifyBoard() {
+  if (!SOLUTION) { showStatus('No solution available', 'error'); return; }
+
+  const starCells = [];
+  for (let i = 0; i < N * N; i++) if (board[i] === 1) starCells.push(i);
+
+  if (starCells.length === 0) {
+    showStatus('Place some stars first!', 'warn'); return;
+  }
+
+  // Ask Prolog to verify when available. Fall back to the cached solution.
+  await checkServer();
+  if (serverOnline) {
+    try {
+      const data = await verifyWithProlog();
+      if (data.success && Array.isArray(data.solution)) SOLUTION = data.solution;
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  let correct = 0, wrong = 0;
+
+  document.querySelectorAll('.cell.verify-ok, .cell.verify-bad').forEach(c => {
+    c.classList.remove('verify-ok', 'verify-bad');
+  });
+
+  starCells.forEach(idx => {
+    const cell = document.querySelector(`.cell[data-idx="${idx}"]`);
+    if (!cell) return;
+    if (SOLUTION[idx] === 1) {
+      cell.classList.add('verify-ok');
+      correct++;
+    } else {
+      cell.classList.add('verify-bad');
+      wrong++;
+    }
+  });
+
+  if (wrong === 0 && correct === N * STARS) {
+    showStatus(`✓ All ${correct} stars correct — well done!`, 'success');
+  } else if (wrong === 0) {
+    showStatus(`✓ ${correct} correct so far, keep going!`, 'success');
+  } else {
+    showStatus(`✗ ${wrong} wrong star${wrong > 1 ? 's' : ''}, ${correct} correct`, 'error');
+  }
+
+  setTimeout(() => {
+    document.querySelectorAll('.cell.verify-ok, .cell.verify-bad').forEach(c => {
+      c.classList.remove('verify-ok', 'verify-bad');
+    });
+  }, 2500);
+}
+
+// ============================================================
+// HINT — reveals one random un-placed star from the solution
+// ============================================================
+async function getHint() {
+  if (!SOLUTION) { showStatus('No solution available', 'error'); return; }
+
+  await checkServer();
+  let idx = -1;
+
+  if (serverOnline) {
+    try {
+      const data = await hintWithProlog();
+      if (data.success && Array.isArray(data.solution)) SOLUTION = data.solution;
+      if (data.success) idx = data.index;
+    } catch (err) {
+      console.warn(err);
+    }
+  }
+
+  // Fallback: choose one solution star not yet placed by the user.
+  if (idx < 0) {
+    const missing = [];
+    for (let i = 0; i < N * N; i++)
+      if (SOLUTION[i] === 1 && board[i] !== 1) missing.push(i);
+    if (missing.length === 0) { showStatus('All stars already placed!', 'success'); return; }
+    idx = missing[Math.floor(Math.random() * missing.length)];
+  }
+
+  board[idx] = 1;
+
+  const cell = document.querySelector(`.cell[data-idx="${idx}"]`);
+  if (cell) {
+    cell.classList.remove('marked','starred','error-flash');
+    cell.classList.add('hint-star');
+    setTimeout(() => {
+      cell.classList.remove('hint-star');
+      cell.classList.add('starred');
+    }, 1200);
+  }
+
+  updateCounters();
+  updateTally();
+  showStatus(`◈ Hint: star revealed at row ${Math.floor(idx/N)+1}, col ${(idx%N)+1}`, 'info');
+  checkWin();
+}
+
+// ============================================================
+// SOLVE — animate the full solution
+// ============================================================
+function solveBoard() {
+  if (!SOLUTION) { showStatus('No solution computed', 'error'); return; }
+
+  // Preserve the elapsed play time before stopping the timer.
+  const elapsedTime = formatTime(timerSec);
+  stopTimer();
+  document.getElementById('win-time').textContent = elapsedTime;
+
+  // Collect cells to reveal (stars in solution not yet placed)
+  const toReveal = [];
+  for (let i = 0; i < N * N; i++)
+    if (SOLUTION[i] === 1 && board[i] !== 1) toReveal.push(i);
+
+  // Also clear wrong marks
+  for (let i = 0; i < N * N; i++)
+    if (SOLUTION[i] !== 1 && board[i] === 1) {
+      board[i] = 0;
+      refreshCell(i);
+    }
+
+  if (toReveal.length === 0) {
+    showStatus('Board already solved!', 'success');
+    document.getElementById('win-time').textContent = elapsedTime;
+    setTimeout(() => document.getElementById('win-overlay').classList.add('show'), 400);
+    return;
+  }
+
+  let k = 0;
+  const interval = setInterval(() => {
+    if (k >= toReveal.length) {
+      clearInterval(interval);
+      solved = true;
+      updateCounters(); updateTally();
+      document.getElementById('win-time').textContent = elapsedTime;
+      showStatus('∞ Solved by Prolog logic!', 'success');
+      setTimeout(() => document.getElementById('win-overlay').classList.add('show'), 700);
+      return;
+    }
+    const idx = toReveal[k++];
+    board[idx] = 1;
+
+    const cell = document.querySelector(`.cell[data-idx="${idx}"]`);
+    if (cell) {
+      cell.classList.remove('marked','starred','hint-star','error-flash');
+      cell.classList.add('solved-star');
+      setTimeout(() => {
+        cell.classList.remove('solved-star');
+        cell.classList.add('starred');
+      }, 600);
+    }
+    updateCounters(); updateTally();
+  }, Math.max(80, 400 / toReveal.length));
+}
+
+// ============================================================
+// CLEAR BOARD
+// ============================================================
+function clearBoard() {
+  board = new Array(N * N).fill(0);
+  solved = false;
+  renderBoard();
+  updateCounters();
+  updateTally();
+  resetTimer(); startTimer();
+  showStatus('Board cleared', 'info');
+}
+
+// ============================================================
+// STATUS
+// ============================================================
+function showStatus(msg, type = 'info') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ============================================================
+// BUTTON WIRING
+// ============================================================
+document.getElementById('btn-new').addEventListener('click', newGame);
+document.getElementById('btn-verify').addEventListener('click', verifyBoard);
+document.getElementById('btn-hint').addEventListener('click', getHint);
+document.getElementById('btn-solve').addEventListener('click', solveBoard);
+document.getElementById('btn-clear').addEventListener('click', clearBoard);
+document.getElementById('win-new').addEventListener('click', newGame);
+
+document.querySelectorAll('.size-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSize = btn.dataset.size;
+    newGame();
+  });
+});
+
+// ============================================================
+// BOOT
+// ============================================================
+checkServer();
+setInterval(checkServer, 10000);
+newGame();
+</script>
+</body>
+</html>
