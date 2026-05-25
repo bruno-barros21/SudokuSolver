@@ -1,0 +1,1870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROLOG ARCADE — Sudoku &amp; Minesweeper</title>
+<meta name="description" content="A premium puzzle arcade featuring Sudoku and Minesweeper, both powered by SWI-Prolog intelligence.">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:ital,wght@0,300;0,700;0,900;1,300;1,700&display=swap" rel="stylesheet">
+<style>
+/* =====================================================
+   SHARED DESIGN TOKENS
+   ===================================================== */
+:root {
+  --bg:      #0e0e10;
+  --surface: #17171a;
+  --border:  #2a2a30;
+  --accent:  #c8f135;
+  --accent2: #f1c835;
+  --correct: #35f1a0;
+  --wrong:   #f13550;
+  --hint:    #35c8f1;
+  --given:   #e8e8f0;
+  --muted:   #5a5a6a;
+  --text:    #d8d8e8;
+  /* minesweeper number colours */
+  --n1: #35c8f1; --n2: #35f1a0; --n3: #f13550;
+  --n4: #7b5cf1; --n5: #f1c835; --n6: #f17b35;
+  --n7: #e8e8f0; --n8: #5a5a6a;
+}
+
+/* game-specific cell sizes via CSS cascade */
+#game-sudoku      { --cell-size: clamp(44px, 8vw, 62px); }
+#game-minesweeper { --cell-size: clamp(28px, 4.5vw, 42px); }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+/* animated dot-grid background */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* =====================================================
+   GLOBAL ANIMATIONS
+   ===================================================== */
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25%      { transform: translateX(-4px); }
+  75%      { transform: translateX(4px); }
+}
+@keyframes pulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+@keyframes winPop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+@keyframes revealCell {
+  0%   { transform: scale(0.85); opacity: 0.5; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(200,241,53,0.1); }
+  50%       { box-shadow: 0 0 40px rgba(200,241,53,0.25); }
+}
+
+/* =====================================================
+   MAIN MENU
+   ===================================================== */
+#main-menu {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px 64px;
+  gap: 56px;
+}
+
+.menu-header {
+  text-align: center;
+  animation: fadeInUp 0.6s ease both;
+}
+
+.menu-logo {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(52px, 11vw, 96px);
+  font-weight: 900;
+  letter-spacing: -4px;
+  line-height: 1;
+  color: var(--given);
+}
+.menu-logo .dot { color: var(--accent); }
+
+.menu-sub {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  margin-top: 14px;
+}
+
+.menu-tagline {
+  font-size: 13px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  margin-top: 6px;
+  opacity: 0.55;
+}
+
+/* GAME CARDS */
+.game-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  width: 100%;
+  max-width: 700px;
+}
+
+.game-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 40px 36px 36px;
+  cursor: pointer;
+  transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1),
+              border-color 0.25s,
+              box-shadow 0.35s;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+  animation: fadeInUp 0.6s ease both;
+  outline: none;
+}
+.game-card:nth-child(2) { animation-delay: 0.1s; }
+
+/* shimmer overlay */
+.game-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 40%, rgba(200,241,53,0.04));
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.game-card.mine-card::before {
+  background: linear-gradient(135deg, transparent 40%, rgba(241,53,80,0.04));
+}
+
+/* left accent stripe */
+.game-card::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  transform: scaleY(0);
+  transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  transform-origin: bottom;
+}
+.game-card.mine-card::after { background: var(--wrong); }
+
+.game-card:hover,
+.game-card:focus-visible {
+  border-color: var(--accent);
+  transform: translateY(-6px);
+  box-shadow: 0 24px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(200,241,53,0.15);
+}
+.game-card.mine-card:hover,
+.game-card.mine-card:focus-visible {
+  border-color: var(--wrong);
+  box-shadow: 0 24px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(241,53,80,0.15);
+}
+.game-card:hover::before,
+.game-card:focus-visible::before { opacity: 1; }
+.game-card:hover::after,
+.game-card:focus-visible::after  { transform: scaleY(1); }
+
+.card-icon {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.card-title {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(30px, 5.5vw, 46px);
+  font-weight: 900;
+  letter-spacing: -2px;
+  color: var(--given);
+  line-height: 1;
+  transition: color 0.25s;
+}
+.game-card:hover .card-title          { color: var(--accent); }
+.game-card.mine-card:hover .card-title { color: var(--wrong); }
+
+.card-desc {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  line-height: 1.7;
+}
+
+.card-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.card-tag {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  transition: border-color 0.2s, color 0.2s;
+}
+.game-card:hover .card-tag           { border-color: rgba(200,241,53,0.3); color: var(--accent); }
+.game-card.mine-card:hover .card-tag { border-color: rgba(241,53,80,0.3);  color: var(--wrong); }
+
+.card-arrow {
+  position: absolute;
+  bottom: 28px;
+  right: 28px;
+  font-size: 18px;
+  color: var(--border);
+  transition: color 0.25s, transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+.game-card:hover .card-arrow           { color: var(--accent);  transform: translateX(5px); }
+.game-card.mine-card:hover .card-arrow { color: var(--wrong); }
+
+.menu-footer {
+  font-size: 10px;
+  color: var(--border);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  animation: fadeInUp 0.6s ease 0.25s both;
+}
+
+/* =====================================================
+   GAME SECTIONS — SHARED
+   ===================================================== */
+.game-section {
+  display: none;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+}
+.game-section.active { display: flex; }
+
+/* back bar */
+.back-bar {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 1000px;
+  padding: 16px 24px 0;
+}
+
+.back-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.back-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* shared header */
+header {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 1000px;
+  padding: 20px 24px 8px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.logo {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(28px, 6vw, 56px);
+  font-weight: 900;
+  letter-spacing: -2px;
+  line-height: 1;
+  color: var(--given);
+}
+.logo span { color: var(--accent); }
+
+.subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding-bottom: 6px;
+}
+
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.timer {
+  font-size: 28px;
+  letter-spacing: 4px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.timer.warning { color: var(--accent2); }
+
+/* difficulty bar */
+.difficulty-bar {
+  position: relative; z-index: 1;
+  display: flex; gap: 6px;
+  padding: 12px 0;
+  flex-wrap: wrap;
+}
+
+.diff-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.diff-btn:hover { border-color: var(--accent); color: var(--accent); }
+.diff-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  font-weight: 700;
+}
+
+/* game layout grid */
+.game-main {
+  position: relative; z-index: 1;
+  width: 100%;
+  padding: 0 24px 48px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 32px;
+  align-items: start;
+}
+@media (max-width: 700px) {
+  .game-main { grid-template-columns: 1fr; }
+}
+
+.board-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  overflow-x: auto;
+}
+
+/* side panel */
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 48px;
+  min-width: 180px;
+}
+
+.action-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 14px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+.action-btn::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  transform: scaleY(0);
+  transition: transform 0.2s;
+}
+.action-btn:hover::before { transform: scaleY(1); }
+.action-btn:hover { border-color: var(--accent); color: var(--accent); padding-left: 24px; }
+
+.action-btn.new-game::before  { background: var(--muted); }
+.action-btn.verify::before    { background: var(--correct); }
+.action-btn.verify:hover      { border-color: var(--correct); color: var(--correct); }
+.action-btn.hint::before      { background: var(--hint); }
+.action-btn.hint:hover        { border-color: var(--hint); color: var(--hint); }
+.action-btn.solve::before     { background: var(--accent2); }
+.action-btn.solve:hover       { border-color: var(--accent2); color: var(--accent2); }
+.action-btn.flag-mode::before { background: var(--wrong); }
+.action-btn.flag-mode:hover   { border-color: var(--wrong); color: var(--wrong); }
+.action-btn.flag-mode.active  { border-color: var(--wrong); color: var(--wrong); padding-left: 24px; }
+.action-btn.flag-mode.active::before { transform: scaleY(1); }
+.action-btn.qmark::before     { background: var(--accent2); }
+.action-btn.qmark:hover       { border-color: var(--accent2); color: var(--accent2); }
+.action-btn.qmark.active      { border-color: var(--accent2); color: var(--accent2); padding-left: 24px; }
+.action-btn.qmark.active::before { transform: scaleY(1); }
+.action-btn.solver::before    { background: var(--hint); }
+.action-btn.solver:hover      { border-color: var(--hint); color: var(--hint); }
+.action-btn.solver:disabled   { opacity: 0.35; cursor: not-allowed; }
+.action-btn.solver:disabled:hover { border-color: var(--border); color: var(--text); padding-left: 20px; }
+.action-btn.solver:disabled:hover::before { transform: scaleY(0); }
+
+.btn-icon { font-size: 16px; flex-shrink: 0; }
+
+.divider, .panel-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+  border: none;
+}
+
+.panel-label {
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 4px 0 2px;
+}
+
+/* server indicators */
+.server-badge, .server-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 2px 0;
+}
+.server-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--wrong);
+  flex-shrink: 0;
+  transition: background 0.4s, box-shadow 0.4s;
+}
+.server-dot.online { background: var(--correct); box-shadow: 0 0 6px var(--correct); }
+
+/* status toast (per-game, not shared) */
+.status-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 12px 24px;
+  font-size: 13px;
+  letter-spacing: 1px;
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+  opacity: 0;
+  z-index: 100;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.status-toast.show           { transform: translateX(-50%) translateY(0); opacity: 1; }
+.status-toast.success        { border-color: var(--correct); color: var(--correct); }
+.status-toast.error          { border-color: var(--wrong);   color: var(--wrong); }
+.status-toast.info           { border-color: var(--hint);    color: var(--hint); }
+.status-toast.warn           { border-color: var(--accent2); color: var(--accent2); }
+
+/* =====================================================
+   SUDOKU-SPECIFIC
+   ===================================================== */
+#game-sudoku .game-main  { max-width: 900px; margin: 0 auto; }
+#game-sudoku .board-wrap { align-items: center; }
+
+#sk-board {
+  display: grid;
+  grid-template-columns: repeat(9, var(--cell-size));
+  grid-template-rows:    repeat(9, var(--cell-size));
+  border: 2px solid var(--given);
+  gap: 0;
+}
+
+.game-sudoku .cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(16px, 3.5vw, 24px);
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  position: relative;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+  outline: none;
+  background: var(--surface);
+  color: var(--accent);
+}
+
+/* thick 3×3 box borders */
+.game-sudoku .cell:nth-child(3n+1):not(:nth-child(9n+1))    { border-left: 2px solid var(--muted); }
+.game-sudoku .cell:nth-child(n+19):nth-child(-n+27),
+.game-sudoku .cell:nth-child(n+46):nth-child(-n+54)         { border-bottom: 2px solid var(--muted); }
+
+.game-sudoku .cell.given       { color: var(--given); cursor: default; background: #1d1d22; }
+.game-sudoku .cell.selected    { background: #1f2820; box-shadow: inset 0 0 0 2px var(--accent); }
+.game-sudoku .cell.related     { background: #1a1a20; }
+.game-sudoku .cell.correct     { color: var(--correct) !important; }
+.game-sudoku .cell.incorrect   { color: var(--wrong)   !important; animation: shake 0.3s; }
+.game-sudoku .cell.hint-flash  { color: var(--hint)    !important; animation: pulse 0.6s ease; }
+.game-sudoku .cell.pencil-mode { font-size: 8px; color: var(--muted); }
+
+/* numpad */
+.numpad {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 6px;
+  width: 100%;
+  max-width: calc(var(--cell-size) * 9);
+}
+
+.num-btn {
+  aspect-ratio: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Fraunces', serif;
+  font-size: clamp(16px, 3vw, 22px);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.num-btn:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+
+/* pencil toggle */
+.pencil-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+}
+.pencil-toggle input { display: none; }
+.toggle-track {
+  width: 36px; height: 20px;
+  background: var(--border);
+  border-radius: 10px;
+  position: relative;
+  transition: background 0.2s;
+}
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 14px; height: 14px;
+  background: var(--muted);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+input:checked + .toggle-track                { background: var(--accent); }
+input:checked + .toggle-track::after        { transform: translateX(16px); background: #000; }
+
+/* sudoku server badge */
+.game-sudoku .server-badge { padding: 0 0 4px; }
+
+/* win overlay */
+#sk-win-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(14,14,16,0.92);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 24px;
+}
+#sk-win-overlay.show { display: flex; }
+
+.win-title {
+  font-family: 'Fraunces', serif;
+  font-size: 80px;
+  font-weight: 900;
+  color: var(--accent);
+  letter-spacing: -4px;
+  animation: winPop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+.win-sub  { color: var(--muted); font-size: 14px; letter-spacing: 3px; }
+.win-time { color: var(--accent2); font-size: 32px; letter-spacing: 4px; }
+
+/* =====================================================
+   MINESWEEPER-SPECIFIC
+   ===================================================== */
+#ms-board {
+  display: grid;
+  border: 2px solid var(--given);
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.game-minesweeper .cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(11px, 2vw, 16px);
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  position: relative;
+  transition: background 0.1s;
+  user-select: none;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.game-minesweeper .cell:hover:not(.revealed)   { background: #202025; }
+.game-minesweeper .cell.revealed               { background: #111114; cursor: default; }
+.game-minesweeper .cell.revealed.n1            { color: var(--n1); }
+.game-minesweeper .cell.revealed.n2            { color: var(--n2); }
+.game-minesweeper .cell.revealed.n3            { color: var(--n3); }
+.game-minesweeper .cell.revealed.n4            { color: var(--n4); }
+.game-minesweeper .cell.revealed.n5            { color: var(--n5); }
+.game-minesweeper .cell.revealed.n6            { color: var(--n6); }
+.game-minesweeper .cell.revealed.n7            { color: var(--n7); }
+.game-minesweeper .cell.revealed.n8            { color: var(--n8); }
+.game-minesweeper .cell.flagged                { color: var(--wrong); }
+.game-minesweeper .cell.question               { color: var(--accent2); }
+.game-minesweeper .cell.mine-hit               { background: var(--wrong) !important; color: #000 !important; animation: shake 0.3s; }
+.game-minesweeper .cell.mine-revealed          { background: #1a1014; color: var(--wrong); cursor: default; }
+.game-minesweeper .cell.flag-wrong             { background: #1a1014; color: var(--wrong); }
+.game-minesweeper .cell.reveal-anim            { animation: revealCell 0.12s ease; }
+.game-minesweeper .cell.safe-hint              { box-shadow: inset 0 0 0 2px var(--correct) !important; }
+.game-minesweeper .cell.mine-hint              { box-shadow: inset 0 0 0 2px var(--wrong)   !important; }
+
+/* mine counter */
+.mine-counter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  letter-spacing: 3px;
+  color: var(--wrong);
+  font-variant-numeric: tabular-nums;
+}
+.mine-counter span { font-size: 13px; color: var(--muted); letter-spacing: 2px; }
+
+/* leaderboard */
+.leaderboard { display: flex; flex-direction: column; gap: 6px; }
+.lb-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+.lb-row .lb-diff  { text-transform: uppercase; letter-spacing: 2px; }
+.lb-row .lb-time  { color: var(--accent2); font-size: 13px; letter-spacing: 2px; }
+.lb-row .lb-time.empty { color: var(--border); }
+
+/* end overlay */
+#ms-end-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(14,14,16,0.92);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 20px;
+}
+#ms-end-overlay.show { display: flex; }
+
+.end-title {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(56px, 10vw, 88px);
+  font-weight: 900;
+  letter-spacing: -4px;
+  animation: winPop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+.end-title.win  { color: var(--accent); }
+.end-title.lose { color: var(--wrong); }
+.end-sub  { color: var(--muted); font-size: 14px; letter-spacing: 3px; }
+.end-time { color: var(--accent2); font-size: 32px; letter-spacing: 4px; }
+.end-best { color: var(--correct); font-size: 13px; letter-spacing: 2px; }
+
+.end-btn {
+  margin-top: 12px;
+  background: none;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding: 14px 36px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.end-btn:hover { background: var(--accent); color: #000; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     MAIN MENU
+     ============================================================ -->
+<div id="main-menu">
+
+  <div class="menu-header">
+    <div class="menu-logo">PROLOG<span class="dot">•</span>ARCADE</div>
+    <div class="menu-sub">Powered by SWI-Prolog</div>
+    <div class="menu-tagline">Select a game to begin</div>
+  </div>
+
+  <div class="game-cards">
+
+    <!-- Sudoku card -->
+    <div class="game-card"
+         id="card-sudoku"
+         role="button"
+         tabindex="0"
+         onclick="showGame('sudoku')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showGame('sudoku')}">
+      <div class="card-icon">⬛</div>
+      <div class="card-title">SUDOKU</div>
+      <div class="card-desc">
+        Logic · Numbers · Strategy<br>
+        9×9 grid · 4 difficulty levels
+      </div>
+      <div class="card-tags">
+        <span class="card-tag">Prolog :8080</span>
+        <span class="card-tag">Hints</span>
+        <span class="card-tag">Auto-solve</span>
+        <span class="card-tag">Notes</span>
+      </div>
+      <div class="card-arrow">→</div>
+    </div>
+
+    <!-- Minesweeper card -->
+    <div class="game-card mine-card"
+         id="card-minesweeper"
+         role="button"
+         tabindex="0"
+         onclick="showGame('minesweeper')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showGame('minesweeper')}">
+      <div class="card-icon">✸</div>
+      <div class="card-title">MINE<span style="color:var(--wrong)">sweeper</span></div>
+      <div class="card-desc">
+        Deduction · Risk · Survival<br>
+        3 board sizes · Solver assistant
+      </div>
+      <div class="card-tags">
+        <span class="card-tag">Prolog :8082</span>
+        <span class="card-tag">Solver step</span>
+        <span class="card-tag">Best times</span>
+      </div>
+      <div class="card-arrow">→</div>
+    </div>
+
+  </div>
+
+  <div class="menu-footer">v2.0 · Prolog Arcade · ESC to return to menu at any time</div>
+</div>
+
+<!-- ============================================================
+     SUDOKU GAME SECTION
+     ============================================================ -->
+<section id="game-sudoku" class="game-section game-sudoku">
+
+  <div class="back-bar">
+    <button class="back-btn" onclick="showMenu()">← Menu</button>
+  </div>
+
+  <header>
+    <div>
+      <div class="logo">SU<span>•</span>DOKU</div>
+      <div class="subtitle">Powered by SWI-Prolog</div>
+    </div>
+    <div style="text-align:right">
+      <div class="timer" id="sk-timer">00:00</div>
+    </div>
+  </header>
+
+  <div style="position:relative;z-index:1;width:100%;max-width:900px;padding:0 24px;">
+    <div class="difficulty-bar">
+      <button class="diff-btn active" data-diff="easy"   onclick="Sudoku.setDiff('easy')">Easy</button>
+      <button class="diff-btn"        data-diff="medium" onclick="Sudoku.setDiff('medium')">Medium</button>
+      <button class="diff-btn"        data-diff="hard"   onclick="Sudoku.setDiff('hard')">Hard</button>
+      <button class="diff-btn"        data-diff="expert" onclick="Sudoku.setDiff('expert')">Expert</button>
+    </div>
+    <div class="server-badge">
+      <div class="server-dot" id="sk-server-dot"></div>
+      <span id="sk-server-label">Prolog server</span>
+    </div>
+  </div>
+
+  <div class="game-main" style="max-width:900px;margin:0 auto;">
+    <div class="board-wrap" style="align-items:center;">
+      <div id="sk-board"></div>
+      <div class="numpad" id="sk-numpad"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;max-width:calc(var(--cell-size)*9)">
+        <label class="pencil-toggle">
+          <input type="checkbox" id="sk-pencil-check">
+          <div class="toggle-track"></div>
+          ✏️ Notes
+        </label>
+      </div>
+    </div>
+
+    <div class="side-panel">
+      <button class="action-btn new-game" onclick="Sudoku.newGame()">
+        <span class="btn-icon">⚡</span> New Game
+      </button>
+      <div class="divider"></div>
+      <button class="action-btn verify" onclick="Sudoku.verifyBoard()">
+        <span class="btn-icon">✓</span> Verify
+      </button>
+      <button class="action-btn hint" onclick="Sudoku.getHint()">
+        <span class="btn-icon">◈</span> Hint
+      </button>
+      <button class="action-btn solve" onclick="Sudoku.solveBoard()">
+        <span class="btn-icon">∞</span> Solve
+      </button>
+    </div>
+  </div>
+
+  <!-- win overlay -->
+  <div id="sk-win-overlay">
+    <div class="win-title">SOLVED</div>
+    <div class="win-time" id="sk-win-time">00:00</div>
+    <div class="win-sub">PUZZLE COMPLETE</div>
+    <button class="action-btn new-game" style="width:auto;"
+            onclick="Sudoku.newGame(); document.getElementById('sk-win-overlay').classList.remove('show')">
+      <span class="btn-icon">⚡</span> Play Again
+    </button>
+  </div>
+
+  <div class="status-toast" id="sk-status"></div>
+</section>
+
+<!-- ============================================================
+     MINESWEEPER GAME SECTION
+     ============================================================ -->
+<section id="game-minesweeper" class="game-section game-minesweeper">
+
+  <div class="back-bar">
+    <button class="back-btn" onclick="showMenu()">← Menu</button>
+  </div>
+
+  <header>
+    <div>
+      <div class="logo">MINE<span>sweeper</span></div>
+      <div class="subtitle">Classic · Random · Infinite</div>
+    </div>
+    <div class="header-right">
+      <div class="timer" id="ms-timer">00:00</div>
+      <div class="mine-counter">
+        <span>MINES</span>
+        <span id="ms-mine-count">000</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="difficulty-bar" style="position:relative;z-index:1;padding:4px 24px 8px;">
+    <button class="diff-btn active" data-diff="easy"   onclick="Minesweeper.setDiff('easy')">Easy</button>
+    <button class="diff-btn"        data-diff="medium" onclick="Minesweeper.setDiff('medium')">Medium</button>
+    <button class="diff-btn"        data-diff="hard"   onclick="Minesweeper.setDiff('hard')">Hard</button>
+  </div>
+
+  <div class="game-main">
+    <div class="board-wrap">
+      <div id="ms-board"></div>
+    </div>
+
+    <div class="side-panel">
+      <button class="action-btn new-game" onclick="Minesweeper.newGame()">
+        <span class="btn-icon">◈</span> New Game
+      </button>
+      <hr class="panel-divider">
+      <button class="action-btn flag-mode" id="ms-flag-btn" onclick="Minesweeper.toggleFlagMode()">
+        <span class="btn-icon">⚑</span> Flag
+      </button>
+      <button class="action-btn qmark" id="ms-qmark-btn" onclick="Minesweeper.toggleQmarkMode()">
+        <span class="btn-icon">?</span> Question
+      </button>
+      <hr class="panel-divider">
+      <button class="action-btn solver" id="ms-solver-btn" onclick="Minesweeper.solveStep()">
+        <span class="btn-icon">⬡</span> Solve Step
+      </button>
+      <div class="server-status">
+        <div class="server-dot" id="ms-server-dot"></div>
+        <span id="ms-server-label">Prolog offline</span>
+      </div>
+      <hr class="panel-divider">
+      <div class="panel-label">Best Times</div>
+      <div class="leaderboard" id="ms-leaderboard"></div>
+    </div>
+  </div>
+
+  <!-- end overlay -->
+  <div id="ms-end-overlay">
+    <div class="end-title" id="ms-end-title">YOU WIN</div>
+    <div class="end-sub"   id="ms-end-sub">CLEARED</div>
+    <div class="end-time"  id="ms-end-time">00:00</div>
+    <div class="end-best"  id="ms-end-best"></div>
+    <button class="end-btn"
+            onclick="Minesweeper.newGame(); Minesweeper.hideOverlay()">Play Again</button>
+  </div>
+
+  <div class="status-toast" id="ms-status"></div>
+</section>
+
+
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+<script>
+'use strict';
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+let activeGame = null;
+
+function showMenu() {
+  document.getElementById('main-menu').style.display = 'flex';
+  document.getElementById('game-sudoku').classList.remove('active');
+  document.getElementById('game-minesweeper').classList.remove('active');
+  if (activeGame === 'sudoku')      Sudoku.pause();
+  if (activeGame === 'minesweeper') Minesweeper.pause();
+  activeGame = null;
+}
+
+function showGame(name) {
+  document.getElementById('main-menu').style.display = 'none';
+  document.getElementById('game-sudoku').classList.remove('active');
+  document.getElementById('game-minesweeper').classList.remove('active');
+  document.getElementById('game-' + name).classList.add('active');
+  activeGame = name;
+  if (name === 'sudoku')      Sudoku.init();
+  if (name === 'minesweeper') Minesweeper.init();
+}
+
+// Global keyboard router: ESC → menu; key events → active game
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && activeGame) { showMenu(); return; }
+  if (activeGame === 'sudoku')      Sudoku.onKeydown(e);
+  if (activeGame === 'minesweeper') Minesweeper.onKeydown(e);
+});
+
+
+// ============================================================
+// ██████  SUDOKU MODULE
+// ============================================================
+window.Sudoku = (function() {
+
+  // ── Puzzle Generator ───────────────────────────────────────
+  var CLUE_COUNT = { easy: 38, medium: 30, hard: 25, expert: 22 };
+
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    return arr;
+  }
+
+  function generateSolvedBoard() {
+    var b = Array(81).fill(0);
+    fillBoard(b);
+    return b;
+  }
+
+  function fillBoard(b) {
+    var idx = b.indexOf(0);
+    if (idx === -1) return true;
+    var nums = shuffle([1,2,3,4,5,6,7,8,9]);
+    for (var k = 0; k < nums.length; k++) {
+      if (isValid(b, idx, nums[k])) {
+        b[idx] = nums[k];
+        if (fillBoard(b)) return true;
+        b[idx] = 0;
+      }
+    }
+    return false;
+  }
+
+  function countSolutions(b, limit) {
+    limit = limit || 2;
+    var idx = b.indexOf(0);
+    if (idx === -1) return 1;
+    var count = 0;
+    for (var n = 1; n <= 9; n++) {
+      if (isValid(b, idx, n)) {
+        b[idx] = n;
+        count += countSolutions(b, limit);
+        b[idx] = 0;
+        if (count >= limit) return count;
+      }
+    }
+    return count;
+  }
+
+  function generatePuzzle(diff) {
+    var solved  = generateSolvedBoard();
+    var puzzle  = solved.slice();
+    var clues   = CLUE_COUNT[diff] || 30;
+    var toRemove = 81 - clues;
+    var indices = shuffle(Array.from({length: 81}, function(_, i){ return i; }));
+    var removed = 0;
+    for (var k = 0; k < indices.length; k++) {
+      if (removed >= toRemove) break;
+      var idx = indices[k];
+      var backup = puzzle[idx];
+      puzzle[idx] = 0;
+      var copy = puzzle.slice();
+      if (countSolutions(copy) === 1) { removed++; }
+      else { puzzle[idx] = backup; }
+    }
+    return { puzzle: puzzle, solution: solved };
+  }
+
+  // ── State ──────────────────────────────────────────────────
+  var puzzle      = [];
+  var board       = [];
+  var solution    = [];
+  var selected    = -1;
+  var timerSec    = 0;
+  var timerInt    = null;
+  var pencilMode  = false;
+  var notes       = [];
+  var difficulty  = 'easy';
+  var serverOnline = false;
+  var initialized  = false;
+  var serverCheckInterval = null;
+
+  var API = 'http://localhost:8080';
+
+  function freshNotes() {
+    return Array(81).fill(null).map(function(){ return new Set(); });
+  }
+
+  // ── Server ─────────────────────────────────────────────────
+  async function checkServer() {
+    try {
+      var res = await fetch(API + '/solve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ puzzle: [5,3,0,0,7,0,0,0,0,6,0,0,1,9,5,0,0,0,0,9,8,0,0,0,0,6,0,
+                                        8,0,0,0,6,0,0,0,3,4,0,0,8,0,3,0,0,1,7,0,0,0,2,0,0,0,6,
+                                        0,6,0,0,0,0,2,8,0,0,0,0,4,1,9,0,0,5,0,0,0,0,8,0,0,7,9] }),
+        signal: AbortSignal.timeout(2000),
+      });
+      serverOnline = res.ok;
+    } catch(e) { serverOnline = false; }
+    document.getElementById('sk-server-dot').className   = 'server-dot' + (serverOnline ? ' online' : '');
+    document.getElementById('sk-server-label').textContent = serverOnline ? 'Prolog — online' : 'Prolog — offline (local mode)';
+  }
+
+  // ── New Game ────────────────────────────────────────────────
+  function newGame() {
+    showStatus('Generating puzzle…', 'info');
+    setTimeout(function() {
+      var gen  = generatePuzzle(difficulty);
+      puzzle   = gen.puzzle;
+      solution = gen.solution;
+      board    = puzzle.slice();
+      notes    = freshNotes();
+      selected = -1;
+      resetTimer();
+      startTimer();
+      renderBoard();
+    }, 30);
+  }
+
+  function setDiff(diff) {
+    difficulty = diff;
+    document.querySelectorAll('#game-sudoku .diff-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.diff === diff);
+    });
+    newGame();
+  }
+
+  // ── Local solver ───────────────────────────────────────────
+  function localSolve(puz, cb) {
+    var b = puz.slice();
+    if (solve(b)) cb(b);
+  }
+
+  function solve(b) {
+    var idx = b.indexOf(0);
+    if (idx === -1) return true;
+    for (var n = 1; n <= 9; n++) {
+      if (isValid(b, idx, n)) {
+        b[idx] = n;
+        if (solve(b)) return true;
+        b[idx] = 0;
+      }
+    }
+    return false;
+  }
+
+  function isValid(b, idx, n) {
+    var row = Math.floor(idx / 9), col = idx % 9;
+    for (var c = 0; c < 9; c++) if (b[row*9+c] === n) return false;
+    for (var r = 0; r < 9; r++) if (b[r*9+col] === n) return false;
+    var br = Math.floor(row/3)*3, bc = Math.floor(col/3)*3;
+    for (var dr = 0; dr < 3; dr++)
+      for (var dc = 0; dc < 3; dc++)
+        if (b[(br+dr)*9+(bc+dc)] === n) return false;
+    return true;
+  }
+
+  // ── Render ─────────────────────────────────────────────────
+  function renderBoard() {
+    var boardEl = document.getElementById('sk-board');
+    boardEl.innerHTML = '';
+    for (var i = 0; i < 81; i++) {
+      var cell   = document.createElement('div');
+      cell.className = 'cell';
+      cell.tabIndex  = 0;
+      cell.dataset.idx = i;
+      var isGiven = puzzle[i] !== 0;
+      if (isGiven) cell.classList.add('given');
+      if (notes[i].size > 0 && board[i] === 0) {
+        cell.classList.add('pencil-mode');
+        cell.textContent = Array.from(notes[i]).sort().join(' ');
+      } else if (board[i] !== 0) {
+        cell.textContent = board[i];
+      }
+      (function(idx){ cell.addEventListener('click', function(){ selectCell(idx); }); })(i);
+      boardEl.appendChild(cell);
+    }
+    highlightRelated();
+  }
+
+  function selectCell(idx) {
+    selected = idx;
+    highlightRelated();
+  }
+
+  function highlightRelated() {
+    var cells = document.querySelectorAll('#sk-board .cell');
+    cells.forEach(function(c, i) {
+      c.classList.remove('selected', 'related');
+      if (i === selected) { c.classList.add('selected'); return; }
+      if (selected === -1) return;
+      var sr = Math.floor(selected/9), sc = selected%9;
+      var cr = Math.floor(i/9),        cc = i%9;
+      if (sr===cr || sc===cc ||
+          (Math.floor(sr/3)===Math.floor(cr/3) && Math.floor(sc/3)===Math.floor(cc/3))) {
+        c.classList.add('related');
+      }
+      if (board[selected] && board[i] === board[selected]) c.classList.add('related');
+    });
+  }
+
+  // ── Numpad ─────────────────────────────────────────────────
+  function buildNumpad() {
+    var np = document.getElementById('sk-numpad');
+    np.innerHTML = '';
+    for (var n = 1; n <= 9; n++) {
+      var btn = document.createElement('button');
+      btn.className   = 'num-btn';
+      btn.textContent = n;
+      (function(num){ btn.addEventListener('click', function(){ enterNumber(num); }); })(n);
+      np.appendChild(btn);
+    }
+  }
+
+  function enterNumber(n) {
+    if (selected === -1 || puzzle[selected] !== 0) return;
+    if (pencilMode) {
+      if (notes[selected].has(n)) notes[selected].delete(n);
+      else notes[selected].add(n);
+      board[selected] = 0;
+    } else {
+      notes[selected].clear();
+      board[selected] = n;
+    }
+    renderBoard();
+  }
+
+  function onKeydown(e) {
+    if (e.key >= '1' && e.key <= '9') { enterNumber(+e.key); return; }
+    if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
+      if (selected !== -1 && puzzle[selected] === 0) {
+        board[selected] = 0;
+        notes[selected].clear();
+        renderBoard();
+      }
+      return;
+    }
+    var arrows = { ArrowUp:-9, ArrowDown:9, ArrowLeft:-1, ArrowRight:1 };
+    if (arrows[e.key] !== undefined && selected !== -1) {
+      e.preventDefault();
+      var next = selected + arrows[e.key];
+      if (next >= 0 && next < 81) selectCell(next);
+    }
+  }
+
+  // ── Verify ─────────────────────────────────────────────────
+  async function verifyBoard() {
+    if (serverOnline) {
+      try {
+        var res = await fetch(API + '/verify', {
+          method: 'POST', headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify({ puzzle: puzzle, current: board })
+        });
+        var data = await res.json();
+        if (data.success) { applyVerifyResults(data.results); return; }
+      } catch(e) {}
+    }
+    if (!solution.length) { showStatus('Solving locally…', 'info'); return; }
+    var results = board.map(function(v, i) {
+      return { index: i, status: v===0 ? 'empty' : v===solution[i] ? 'correct' : 'incorrect' };
+    });
+    applyVerifyResults(results);
+  }
+
+  function applyVerifyResults(results) {
+    var cells    = document.querySelectorAll('#sk-board .cell');
+    var wrongs   = 0, corrects = 0, empties = 0;
+    results.forEach(function(r) {
+      if (r.status === 'incorrect') { cells[r.index].classList.add('incorrect'); wrongs++; }
+      if (r.status === 'correct' && !puzzle[r.index]) { cells[r.index].classList.add('correct'); corrects++; }
+      if (r.status === 'empty') empties++;
+    });
+    var totalUserCells = results.filter(function(r){ return !puzzle[r.index]; }).length;
+    if (wrongs === 0 && empties === 0 && corrects === totalUserCells) {
+      setTimeout(function(){ onWin(); }, 600);
+    } else if (wrongs === 0 && corrects > 0) {
+      showStatus('✓ All ' + corrects + ' filled cells correct!', 'success');
+    } else if (wrongs > 0) {
+      showStatus('✗ ' + wrongs + ' incorrect cell' + (wrongs>1?'s':''), 'error');
+    } else {
+      showStatus('No user cells to verify yet', 'info');
+    }
+    setTimeout(function() {
+      document.querySelectorAll('#sk-board .cell.incorrect, #sk-board .cell.correct').forEach(function(c) {
+        c.classList.remove('incorrect', 'correct');
+      });
+    }, 3000);
+  }
+
+  // ── Hint ───────────────────────────────────────────────────
+  async function getHint() {
+    if (serverOnline) {
+      try {
+        var res = await fetch(API + '/hint', {
+          method: 'POST', headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify({ puzzle: puzzle, current: board })
+        });
+        var data = await res.json();
+        if (data.success && data.index >= 0) { applyHint(data.index, data.value); return; }
+      } catch(e) {}
+    }
+    if (!solution.length) { showStatus('Computing…', 'info'); return; }
+    var emptyCells = board.reduce(function(acc, v, i){ if (v === 0) acc.push(i); return acc; }, []);
+    if (emptyCells.length === 0) { showStatus('Board is complete!', 'success'); return; }
+    var idx = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+    applyHint(idx, solution[idx]);
+  }
+
+  function applyHint(idx, val) {
+    board[idx] = val;
+    notes[idx].clear();
+    renderBoard();
+    flashCell(idx, 'hint-flash');
+    showStatus('◈ Hint: ' + val + ' placed', 'info');
+  }
+
+  // ── Solve ──────────────────────────────────────────────────
+  async function solveBoard() {
+    if (serverOnline) {
+      try {
+        showStatus('Prolog solving…', 'info');
+        var res = await fetch(API + '/solve', {
+          method: 'POST', headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify({ puzzle: puzzle })
+        });
+        var data = await res.json();
+        if (data.success) { solution = data.solution; animateSolve(data.solution); return; }
+      } catch(e) {}
+    }
+    showStatus('Solving locally…', 'info');
+    setTimeout(function() {
+      localSolve(puzzle, function(sol) { solution = sol; animateSolve(sol); });
+    }, 50);
+  }
+
+  function animateSolve(sol) {
+    stopTimer();
+    var empties = [];
+    sol.forEach(function(v, i){ if (puzzle[i] === 0) empties.push({i:i, v:v}); });
+    var k = 0;
+    var interval = setInterval(function() {
+      if (k >= empties.length) {
+        clearInterval(interval);
+        showStatus('∞ Puzzle solved by Prolog!', 'success');
+        return;
+      }
+      var item = empties[k++];
+      board[item.i] = item.v;
+      notes[item.i].clear();
+      renderBoard();
+      flashCell(item.i, 'hint-flash');
+    }, 20);
+  }
+
+  // ── Win ────────────────────────────────────────────────────
+  function onWin() {
+    stopTimer();
+    document.getElementById('sk-win-time').textContent = formatTime(timerSec);
+    document.getElementById('sk-win-overlay').classList.add('show');
+  }
+
+  // ── Timer ──────────────────────────────────────────────────
+  function startTimer() {
+    timerInt = setInterval(function() {
+      timerSec++;
+      var el = document.getElementById('sk-timer');
+      el.textContent = formatTime(timerSec);
+      el.className   = 'timer' + (timerSec > 600 ? ' warning' : '');
+    }, 1000);
+  }
+  function stopTimer()  { clearInterval(timerInt); timerInt = null; }
+  function resetTimer() { stopTimer(); timerSec = 0; document.getElementById('sk-timer').textContent = '00:00'; }
+  function pause()      { stopTimer(); }
+  function formatTime(s) {
+    return Math.floor(s/60).toString().padStart(2,'0') + ':' + (s%60).toString().padStart(2,'0');
+  }
+
+  // ── Utils ──────────────────────────────────────────────────
+  function flashCell(idx, cls) {
+    var cell = document.querySelector('#sk-board .cell[data-idx="' + idx + '"]');
+    if (!cell) return;
+    cell.classList.add(cls);
+    setTimeout(function(){ cell.classList.remove(cls); }, 700);
+  }
+
+  function showStatus(msg, type) {
+    type = type || 'info';
+    var el = document.getElementById('sk-status');
+    el.textContent = msg;
+    el.className   = 'status-toast show ' + type;
+    clearTimeout(el._t);
+    el._t = setTimeout(function(){ el.classList.remove('show'); }, 2800);
+  }
+
+  // ── Init ───────────────────────────────────────────────────
+  function init() {
+    if (!initialized) {
+      buildNumpad();
+      document.getElementById('sk-pencil-check').addEventListener('change', function(e) {
+        pencilMode = e.target.checked;
+      });
+      initialized = true;
+      serverCheckInterval = setInterval(checkServer, 10000);
+    }
+    checkServer().then(function(){ newGame(); });
+  }
+
+  return { init: init, newGame: newGame, setDiff: setDiff,
+           verifyBoard: verifyBoard, getHint: getHint, solveBoard: solveBoard,
+           onKeydown: onKeydown, pause: pause };
+
+})(); // end Sudoku
+
+
+// ============================================================
+// ██████  MINESWEEPER MODULE
+// ============================================================
+window.Minesweeper = (function() {
+
+  var CONFIGS = {
+    easy:   { rows:  9, cols:  9, mines:  10 },
+    medium: { rows: 16, cols: 16, mines:  40 },
+    hard:   { rows: 16, cols: 30, mines:  99 },
+  };
+
+  // ── State ──────────────────────────────────────────────────
+  var cfg        = CONFIGS.easy;
+  var difficulty  = 'easy';
+  var mines       = [];
+  var counts      = [];
+  var revealed    = [];
+  var flagged     = [];
+  var questioned  = [];
+  var gameState   = 'idle';
+  var firstClick  = true;
+  var timerSec    = 0;
+  var timerInt    = null;
+  var flagMode    = false;
+  var qmarkMode   = false;
+  var bestTimes   = JSON.parse(localStorage.getItem('ms_best') || '{}');
+  var serverOnline = false;
+  var lastHints   = null;
+  var statusTimer = null;
+  var initialized  = false;
+
+  var API = 'http://localhost:8082';
+
+  // ── Utils ──────────────────────────────────────────────────
+  function cellIdx(r, c)  { return r * cfg.cols + c; }
+  function rowCol(i)       { return [Math.floor(i / cfg.cols), i % cfg.cols]; }
+
+  function neighbours(r, c) {
+    var out = [];
+    for (var dr = -1; dr <= 1; dr++)
+      for (var dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        var nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < cfg.rows && nc >= 0 && nc < cfg.cols)
+          out.push(cellIdx(nr, nc));
+      }
+    return out;
+  }
+
+  function pad(n, w)  { w = w || 2; return String(n).padStart(w, '0'); }
+  function fmtTime(s) { return pad(Math.floor(s/60)) + ':' + pad(s%60); }
+
+  // ── Timer ──────────────────────────────────────────────────
+  function startTimer() {
+    timerSec = 0;
+    clearInterval(timerInt);
+    timerInt = setInterval(function() {
+      timerSec++;
+      document.getElementById('ms-timer').textContent = fmtTime(timerSec);
+    }, 1000);
+  }
+  function stopTimer()  { clearInterval(timerInt); }
+  function pause()      { stopTimer(); }
+  function resetTimer() {
+    stopTimer();
+    timerSec = 0;
+    document.getElementById('ms-timer').textContent = '00:00';
+  }
+
+  // ── Generate ───────────────────────────────────────────────
+  function generateBoard(safeI) {
+    var total = cfg.rows * cfg.cols;
+    mines  = Array(total).fill(false);
+    counts = Array(total).fill(0);
+    var rc   = rowCol(safeI);
+    var safe = new Set([safeI].concat(neighbours(rc[0], rc[1])));
+    var placed = 0;
+    while (placed < cfg.mines) {
+      var i = Math.floor(Math.random() * total);
+      if (!mines[i] && !safe.has(i)) { mines[i] = true; placed++; }
+    }
+    for (var j = 0; j < total; j++) {
+      if (mines[j]) continue;
+      var rc2 = rowCol(j);
+      counts[j] = neighbours(rc2[0], rc2[1]).filter(function(k){ return mines[k]; }).length;
+    }
+  }
+
+  // ── Reveal ─────────────────────────────────────────────────
+  function reveal(i) {
+    if (revealed[i] || flagged[i] || questioned[i]) return;
+    revealed[i] = true;
+    var cell = document.querySelector('#ms-board [data-idx="' + i + '"]');
+    if (cell) { cell.classList.add('revealed', 'reveal-anim'); renderCell(i, cell); }
+    if (!mines[i] && counts[i] === 0) {
+      var rc = rowCol(i);
+      neighbours(rc[0], rc[1]).forEach(function(j){ if (!revealed[j]) reveal(j); });
+    }
+  }
+
+  // ── Render ─────────────────────────────────────────────────
+  function renderCell(i, el) {
+    el = el || document.querySelector('#ms-board [data-idx="' + i + '"]');
+    if (!el) return;
+    el.className   = 'cell';
+    el.textContent = '';
+    if (revealed[i]) {
+      el.classList.add('revealed');
+      if (mines[i])        { el.textContent = '✸'; }
+      else if (counts[i] > 0) { el.classList.add('n' + counts[i]); el.textContent = counts[i]; }
+    } else if (flagged[i]) {
+      el.classList.add('flagged');   el.textContent = '⚑';
+    } else if (questioned[i]) {
+      el.classList.add('question');  el.textContent = '?';
+    }
+  }
+
+  function renderBoard() {
+    var boardEl = document.getElementById('ms-board');
+    boardEl.style.gridTemplateColumns = 'repeat(' + cfg.cols + ', var(--cell-size))';
+    boardEl.style.gridTemplateRows    = 'repeat(' + cfg.rows + ', var(--cell-size))';
+    boardEl.innerHTML = '';
+    var total = cfg.rows * cfg.cols;
+    for (var i = 0; i < total; i++) {
+      var cell = document.createElement('div');
+      cell.className   = 'cell';
+      cell.dataset.idx = i;
+      (function(idx) {
+        cell.addEventListener('click',       function()  { onLeftClick(idx); });
+        cell.addEventListener('contextmenu', function(e) { e.preventDefault(); onRightClick(idx); });
+      })(i);
+      boardEl.appendChild(cell);
+      renderCell(i, cell);
+    }
+    updateMineCounter();
+  }
+
+  function updateMineCounter() {
+    var remaining = cfg.mines - flagged.filter(Boolean).length;
+    document.getElementById('ms-mine-count').textContent = pad(Math.max(0, remaining), 3);
+  }
+
+  // ── Input ──────────────────────────────────────────────────
+  function onLeftClick(i) {
+    if (gameState === 'won' || gameState === 'lost') return;
+    if (flagged[i] || questioned[i]) return;
+    if (revealed[i]) { chordReveal(i); return; }
+    if (flagMode || qmarkMode) { onRightClick(i); return; }
+    if (firstClick) {
+      firstClick = false;
+      generateBoard(i);
+      gameState = 'playing';
+      startTimer();
+    }
+    if (mines[i]) { onLose(i); return; }
+    reveal(i);
+    checkWin();
+  }
+
+  function onRightClick(i) {
+    if (gameState === 'won' || gameState === 'lost') return;
+    if (revealed[i]) return;
+    if (flagged[i])        { flagged[i] = false;    questioned[i] = true; }
+    else if (questioned[i]){ questioned[i] = false; }
+    else                   { flagged[i] = true; }
+    renderCell(i);
+    updateMineCounter();
+  }
+
+  function chordReveal(i) {
+    if (!revealed[i] || mines[i] || counts[i] === 0) return;
+    var rc = rowCol(i);
+    var nb = neighbours(rc[0], rc[1]);
+    if (nb.filter(function(j){ return flagged[j]; }).length !== counts[i]) return;
+    var hitMine = false;
+    nb.forEach(function(j) {
+      if (!revealed[j] && !flagged[j]) {
+        if (mines[j]) hitMine = true;
+        else reveal(j);
+      }
+    });
+    if (hitMine) {
+      var wrongMine = nb.find(function(j){ return mines[j] && !flagged[j]; });
+      if (wrongMine !== undefined) onLose(wrongMine);
+    } else { checkWin(); }
+  }
+
+  function toggleFlagMode() {
+    flagMode  = !flagMode;
+    qmarkMode = false;
+    document.getElementById('ms-flag-btn').classList.toggle('active', flagMode);
+    document.getElementById('ms-qmark-btn').classList.remove('active');
+  }
+
+  function toggleQmarkMode() {
+    qmarkMode = !qmarkMode;
+    flagMode  = false;
+    document.getElementById('ms-qmark-btn').classList.toggle('active', qmarkMode);
+    document.getElementById('ms-flag-btn').classList.remove('active');
+  }
+
+  // ── Win / Lose ─────────────────────────────────────────────
+  function checkWin() {
+    var total = cfg.rows * cfg.cols;
+    var unrevealedSafe = Array.from({length: total}, function(_, i){ return i; })
+                              .filter(function(i){ return !mines[i] && !revealed[i]; });
+    if (unrevealedSafe.length === 0) onWin();
+  }
+
+  function onWin() {
+    gameState = 'won';
+    stopTimer();
+    mines.forEach(function(m, i){ if (m && !flagged[i]) { flagged[i] = true; renderCell(i); } });
+    updateMineCounter();
+    var prev  = bestTimes[difficulty];
+    var isNew = !prev || timerSec < prev;
+    if (isNew) { bestTimes[difficulty] = timerSec; localStorage.setItem('ms_best', JSON.stringify(bestTimes)); }
+    document.getElementById('ms-end-title').textContent = 'YOU WIN';
+    document.getElementById('ms-end-title').className   = 'end-title win';
+    document.getElementById('ms-end-sub').textContent   = 'CLEARED · ' + difficulty.toUpperCase();
+    document.getElementById('ms-end-time').textContent  = fmtTime(timerSec);
+    document.getElementById('ms-end-best').textContent  = isNew ? '★ NEW BEST TIME' : '';
+    document.getElementById('ms-end-overlay').classList.add('show');
+    renderLeaderboard();
+  }
+
+  function onLose(hitIdx) {
+    gameState = 'lost';
+    stopTimer();
+    mines.forEach(function(m, i) {
+      if (!m) return;
+      var cell = document.querySelector('#ms-board [data-idx="' + i + '"]');
+      if (!cell) return;
+      if (i === hitIdx) { cell.classList.add('mine-hit');      cell.textContent = '✸'; }
+      else if (!flagged[i]) { cell.classList.add('mine-revealed'); cell.textContent = '✸'; }
+    });
+    flagged.forEach(function(f, i) {
+      if (f && !mines[i]) {
+        var cell = document.querySelector('#ms-board [data-idx="' + i + '"]');
+        if (cell) { cell.classList.add('flag-wrong'); cell.textContent = '✗'; }
+      }
+    });
+    document.getElementById('ms-end-title').textContent = 'BOOM';
+    document.getElementById('ms-end-title').className   = 'end-title lose';
+    document.getElementById('ms-end-sub').textContent   = 'GAME OVER';
+    document.getElementById('ms-end-time').textContent  = fmtTime(timerSec);
+    document.getElementById('ms-end-best').textContent  = '';
+    setTimeout(function(){ document.getElementById('ms-end-overlay').classList.add('show'); }, 800);
+  }
+
+  function hideOverlay() {
+    document.getElementById('ms-end-overlay').classList.remove('show');
+  }
+
+  // ── Leaderboard ────────────────────────────────────────────
+  function renderLeaderboard() {
+    var lb = document.getElementById('ms-leaderboard');
+    lb.innerHTML = ['easy','medium','hard'].map(function(d) {
+      var t = bestTimes[d];
+      return '<div class="lb-row"><span class="lb-diff">' + d + '</span>' +
+             '<span class="lb-time' + (t ? '' : ' empty') + '">' + (t ? fmtTime(t) : '--:--') + '</span></div>';
+    }).join('');
+  }
+
+  // ── Difficulty ─────────────────────────────────────────────
+  function setDiff(d) {
+    difficulty = d;
+    cfg = CONFIGS[d];
+    document.querySelectorAll('#game-minesweeper .diff-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.diff === d);
+    });
+    newGame();
+  }
+
+  // ── New Game ───────────────────────────────────────────────
+  function newGame() {
+    var total  = cfg.rows * cfg.cols;
+    mines      = Array(total).fill(false);
+    counts     = Array(total).fill(0);
+    revealed   = Array(total).fill(false);
+    flagged    = Array(total).fill(false);
+    questioned = Array(total).fill(false);
+    gameState  = 'idle';
+    firstClick = true;
+    flagMode   = false;
+    qmarkMode  = false;
+    document.getElementById('ms-flag-btn').classList.remove('active');
+    document.getElementById('ms-qmark-btn').classList.remove('active');
+    resetTimer();
+    renderBoard();
+    renderLeaderboard();
+  }
+
+  // ── Keyboard ───────────────────────────────────────────────
+  function onKeydown(e) {
+    if (e.key === 'f' || e.key === 'F') toggleFlagMode();
+    if (e.key === 'q' || e.key === 'Q') toggleQmarkMode();
+    if (e.key === 'r' || e.key === 'R') newGame();
+    if (e.key === 's' || e.key === 'S') solveStep();
+  }
+
+  // ── Status ─────────────────────────────────────────────────
+  function showStatus(msg, type) {
+    type = type || 'info';
+    var el = document.getElementById('ms-status');
+    el.textContent = msg;
+    el.className   = 'status-toast show ' + type;
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(function(){ el.className = 'status-toast'; }, 3000);
+  }
+
+  // ── Prolog server ──────────────────────────────────────────
+  async function checkServer() {
+    try {
+      var res = await fetch(API + '/analyse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ board: Array(9).fill(-2), rows: 3, cols: 3 }),
+        signal: AbortSignal.timeout(2000),
+      });
+      serverOnline = res.ok;
+    } catch(e) { serverOnline = false; }
+    document.getElementById('ms-server-dot').className     = 'server-dot' + (serverOnline ? ' online' : '');
+    document.getElementById('ms-server-label').textContent = serverOnline ? 'Prolog online' : 'Prolog offline';
+  }
+
+  // ── Prolog board encoding ───────────────────────────────────
+  function buildPrologBoard() {
+    var total = cfg.rows * cfg.cols;
+    return Array.from({ length: total }, function(_, i) {
+      if (flagged[i])   return -1;
+      if (!revealed[i]) return -2;
+      return counts[i];
+    });
+  }
+
+  // ── Solve Step ─────────────────────────────────────────────
+  async function solveStep() {
+    if (gameState === 'idle') { showStatus('Start the game first — click any cell', 'warn'); return; }
+    if (gameState === 'won' || gameState === 'lost') return;
+    clearHints();
+    var local = localDeduce();
+    if (serverOnline) {
+      showStatus('Prolog analysing…', 'info');
+      try {
+        var boardArr = buildPrologBoard();
+        var res = await fetch(API + '/analyse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ board: boardArr, rows: cfg.rows, cols: cfg.cols }),
+        });
+        var data = await res.json();
+        if (data.success) {
+          var mergedSafe  = Array.from(new Set(data.safe.concat(local.safe)));
+          var mergedMines = Array.from(new Set(data.mines.concat(local.mines)));
+          var finalSafe   = mergedSafe.filter(function(i){ return !mergedMines.includes(i); });
+          var finalMines  = mergedMines.filter(function(i){ return !mergedSafe.includes(i); });
+          if (finalSafe.length > 0 || finalMines.length > 0) {
+            applyHints(finalSafe, finalMines); return;
+          }
+        }
+      } catch(e) {}
+    }
+    if (local.safe.length === 0 && local.mines.length === 0) {
+      showStatus('No certain deductions possible right now', 'warn');
+    } else {
+      applyHints(local.safe, local.mines);
+    }
+  }
+
+  function applyHints(safeCells, mineCells) {
+    lastHints = { safe: safeCells, mines: mineCells };
+    safeCells.forEach(function(i) {
+      var el = document.querySelector('#ms-board [data-idx="' + i + '"]');
+      if (el) el.classList.add('safe-hint');
+    });
+    mineCells.forEach(function(i) {
+      var el = document.querySelector('#ms-board [data-idx="' + i + '"]');
+      if (el) el.classList.add('mine-hint');
+    });
+    var s = safeCells.length, m = mineCells.length;
+    showStatus('⬡ ' + s + ' safe · ' + m + ' mine' + (m!==1?'s':'') + ' — acting in 1.5s', 'info');
+    setTimeout(function() {
+      clearHints();
+      safeCells.forEach(function(i){ if (!revealed[i] && !flagged[i]) reveal(i); });
+      mineCells.forEach(function(i){ if (!revealed[i]) { flagged[i] = true; questioned[i] = false; renderCell(i); } });
+      updateMineCounter();
+      checkWin();
+      lastHints = null;
+    }, 1500);
+  }
+
+  function clearHints() {
+    document.querySelectorAll('#ms-board .safe-hint, #ms-board .mine-hint').forEach(function(el) {
+      el.classList.remove('safe-hint', 'mine-hint');
+    });
+  }
+
+  // ── Local Deduction ────────────────────────────────────────
+  function localDeduce() {
+    var safeSet = new Set(), mineSet = new Set();
+    var total   = cfg.rows * cfg.cols;
+    for (var i = 0; i < total; i++) {
+      if (!revealed[i] || mines[i] || counts[i] === 0) continue;
+      var rc = rowCol(i);
+      var nbs = neighbours(rc[0], rc[1]);
+      var flaggedNbs    = nbs.filter(function(j){ return flagged[j]; });
+      var unrevealedNbs = nbs.filter(function(j){ return !revealed[j] && !flagged[j]; });
+      var remaining     = counts[i] - flaggedNbs.length;
+      if (remaining === 0)                       unrevealedNbs.forEach(function(j){ safeSet.add(j); });
+      else if (remaining === unrevealedNbs.length) unrevealedNbs.forEach(function(j){ mineSet.add(j); });
+    }
+    return {
+      safe:  Array.from(safeSet).filter(function(i){ return !mineSet.has(i); }),
+      mines: Array.from(mineSet).filter(function(i){ return !safeSet.has(i); }),
+    };
+  }
+
+  // ── Init ───────────────────────────────────────────────────
+  function init() {
+    if (!initialized) {
+      initialized = true;
+      setInterval(checkServer, 10000);
+    }
+    checkServer();
+    newGame();
+  }
+
+  return { init: init, newGame: newGame, setDiff: setDiff,
+           toggleFlagMode: toggleFlagMode, toggleQmarkMode: toggleQmarkMode,
+           solveStep: solveStep, onKeydown: onKeydown, pause: pause, hideOverlay: hideOverlay };
+
+})(); // end Minesweeper
+</script>
+</body>
+</html>
