@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PROLOG ARCADE — Sudoku &amp; Minesweeper</title>
-<meta name="description" content="A premium puzzle arcade featuring Sudoku and Minesweeper, both powered by SWI-Prolog intelligence.">
+<title>PROLOG ARCADE — Sudoku, Minesweeper &amp; Star Battle</title>
+<meta name="description" content="A premium puzzle arcade featuring Sudoku, Minesweeper and Star Battle, all powered by SWI-Prolog intelligence.">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:ital,wght@0,300;0,700;0,900;1,300;1,700&display=swap" rel="stylesheet">
 <style>
 /* =====================================================
@@ -31,6 +31,7 @@
 /* game-specific cell sizes via CSS cascade */
 #game-sudoku      { --cell-size: clamp(44px, 8vw, 62px); }
 #game-minesweeper { --cell-size: clamp(28px, 4.5vw, 42px); }
+#game-starbattle  { --cell-size: clamp(38px, 7.5vw, 56px); }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -87,6 +88,19 @@ body::before {
   0%, 100% { box-shadow: 0 0 20px rgba(200,241,53,0.1); }
   50%       { box-shadow: 0 0 40px rgba(200,241,53,0.25); }
 }
+@keyframes starPop {
+  0%   { transform: scale(0.4) rotate(-20deg); opacity: 0; }
+  100% { transform: scale(1)   rotate(0deg);   opacity: 1; }
+}
+@keyframes errShake {
+  0%,100% { transform: translateX(0); }
+  25%     { transform: translateX(-4px); }
+  75%     { transform: translateX(4px); }
+}
+@keyframes winFloat {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-8px); }
+}
 
 /* =====================================================
    MAIN MENU
@@ -138,10 +152,10 @@ body::before {
 /* GAME CARDS */
 .game-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 20px;
   width: 100%;
-  max-width: 700px;
+  max-width: 1020px;
 }
 
 .game-card {
@@ -162,6 +176,7 @@ body::before {
   outline: none;
 }
 .game-card:nth-child(2) { animation-delay: 0.1s; }
+.game-card:nth-child(3) { animation-delay: 0.2s; }
 
 /* shimmer overlay */
 .game-card::before {
@@ -176,6 +191,9 @@ body::before {
 .game-card.mine-card::before {
   background: linear-gradient(135deg, transparent 40%, rgba(241,53,80,0.04));
 }
+.game-card.star-card::before {
+  background: linear-gradient(135deg, transparent 40%, rgba(245,208,58,0.06));
+}
 
 /* left accent stripe */
 .game-card::after {
@@ -189,6 +207,7 @@ body::before {
   transform-origin: bottom;
 }
 .game-card.mine-card::after { background: var(--wrong); }
+.game-card.star-card::after { background: #f5d03a; }
 
 .game-card:hover,
 .game-card:focus-visible {
@@ -200,6 +219,11 @@ body::before {
 .game-card.mine-card:focus-visible {
   border-color: var(--wrong);
   box-shadow: 0 24px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(241,53,80,0.15);
+}
+.game-card.star-card:hover,
+.game-card.star-card:focus-visible {
+  border-color: #f5d03a;
+  box-shadow: 0 24px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(245,208,58,0.2);
 }
 .game-card:hover::before,
 .game-card:focus-visible::before { opacity: 1; }
@@ -220,8 +244,9 @@ body::before {
   line-height: 1;
   transition: color 0.25s;
 }
-.game-card:hover .card-title          { color: var(--accent); }
-.game-card.mine-card:hover .card-title { color: var(--wrong); }
+.game-card:hover .card-title           { color: var(--accent); }
+.game-card.mine-card:hover .card-title  { color: var(--wrong); }
+.game-card.star-card:hover .card-title  { color: #f5d03a; }
 
 .card-desc {
   font-size: 11px;
@@ -247,8 +272,9 @@ body::before {
   color: var(--muted);
   transition: border-color 0.2s, color 0.2s;
 }
-.game-card:hover .card-tag           { border-color: rgba(200,241,53,0.3); color: var(--accent); }
-.game-card.mine-card:hover .card-tag { border-color: rgba(241,53,80,0.3);  color: var(--wrong); }
+.game-card:hover .card-tag            { border-color: rgba(200,241,53,0.3); color: var(--accent); }
+.game-card.mine-card:hover .card-tag  { border-color: rgba(241,53,80,0.3);  color: var(--wrong); }
+.game-card.star-card:hover .card-tag  { border-color: rgba(245,208,58,0.4); color: #f5d03a; }
 
 .card-arrow {
   position: absolute;
@@ -258,8 +284,9 @@ body::before {
   color: var(--border);
   transition: color 0.25s, transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
 }
-.game-card:hover .card-arrow           { color: var(--accent);  transform: translateX(5px); }
-.game-card.mine-card:hover .card-arrow { color: var(--wrong); }
+.game-card:hover .card-arrow            { color: var(--accent);  transform: translateX(5px); }
+.game-card.mine-card:hover .card-arrow  { color: var(--wrong); }
+.game-card.star-card:hover .card-arrow  { color: #f5d03a; }
 
 .menu-footer {
   font-size: 10px;
@@ -761,6 +788,208 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
   transition: all 0.2s;
 }
 .end-btn:hover { background: var(--accent); color: #000; }
+
+/* =====================================================
+   STAR BATTLE-SPECIFIC
+   ===================================================== */
+#game-starbattle .game-main { max-width: 960px; margin: 0 auto; }
+#game-starbattle .board-wrap { align-items: center; }
+
+/* starfield twinkle background unique to star battle */
+#game-starbattle::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(245,208,58,0.6)  0%, transparent 100%),
+    radial-gradient(1px 1px at 43%  8%, rgba(245,208,58,0.45) 0%, transparent 100%),
+    radial-gradient(1px 1px at 67% 31%, rgba(245,208,58,0.4)  0%, transparent 100%),
+    radial-gradient(1px 1px at 85% 12%, rgba(245,208,58,0.55) 0%, transparent 100%),
+    radial-gradient(1px 1px at 23% 55%, rgba(245,208,58,0.35) 0%, transparent 100%),
+    radial-gradient(1px 1px at 90% 64%, rgba(245,208,58,0.5)  0%, transparent 100%),
+    radial-gradient(1px 1px at  5% 78%, rgba(245,208,58,0.4)  0%, transparent 100%),
+    radial-gradient(1px 1px at 55% 82%, rgba(245,208,58,0.3)  0%, transparent 100%),
+    radial-gradient(1px 1px at 76% 90%, rgba(245,208,58,0.45) 0%, transparent 100%),
+    radial-gradient(1px 1px at 34% 95%, rgba(245,208,58,0.35) 0%, transparent 100%);
+  background-size: 100% 100%;
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#sb-board {
+  display: grid;
+  position: relative;
+  border: 2.5px solid var(--given);
+}
+
+.game-starbattle .cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(18px, 3.8vw, 30px);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.12s;
+  user-select: none;
+  outline: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.game-starbattle .cell:hover { background: #1c1c25; }
+
+/* starred state */
+.game-starbattle .cell.starred        { color: #f5d03a; }
+.game-starbattle .cell.starred::after { content: '★'; font-size: inherit; animation: starPop 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+
+/* hint / solved star states */
+.game-starbattle .cell.hint-star        { color: #3ab8f5 !important; }
+.game-starbattle .cell.hint-star::after { content: '★'; }
+.game-starbattle .cell.solved-star        { color: #3af5a0 !important; }
+.game-starbattle .cell.solved-star::after { content: '★'; }
+
+/* marked X */
+.game-starbattle .cell.marked::before {
+  content: '✕';
+  font-size: calc(var(--cell-size) * 0.28);
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+/* error flash */
+.game-starbattle .cell.error-flash {
+  animation: errShake 0.3s;
+  background: rgba(245,58,80,0.15) !important;
+}
+
+/* region thick borders via JS-added classes */
+.game-starbattle .cell.border-top    { border-top-color:    var(--given) !important; border-top-width:    2.5px !important; }
+.game-starbattle .cell.border-bottom { border-bottom-color: var(--given) !important; border-bottom-width: 2.5px !important; }
+.game-starbattle .cell.border-left   { border-left-color:   var(--given) !important; border-left-width:   2.5px !important; }
+.game-starbattle .cell.border-right  { border-right-color:  var(--given) !important; border-right-width:  2.5px !important; }
+
+/* verify highlights */
+.game-starbattle .cell.verify-ok  { box-shadow: inset 0 0 0 2px #3af5a0; }
+.game-starbattle .cell.verify-bad { box-shadow: inset 0 0 0 2px var(--wrong); animation: errShake 0.35s; }
+
+/* region colour tints */
+.game-starbattle .r0  { background: #14141a; }
+.game-starbattle .r1  { background: #161420; }
+.game-starbattle .r2  { background: #141820; }
+.game-starbattle .r3  { background: #161a14; }
+.game-starbattle .r4  { background: #1a1414; }
+.game-starbattle .r5  { background: #191519; }
+.game-starbattle .r6  { background: #141a18; }
+.game-starbattle .r7  { background: #1a1814; }
+.game-starbattle .r8  { background: #14181a; }
+.game-starbattle .r9  { background: #1a1418; }
+.game-starbattle .r0:hover { background: #1c1c25; }
+.game-starbattle .r1:hover { background: #1e1c2a; }
+.game-starbattle .r2:hover { background: #1c202a; }
+.game-starbattle .r3:hover { background: #1e221c; }
+.game-starbattle .r4:hover { background: #221c1c; }
+.game-starbattle .r5:hover { background: #211d21; }
+.game-starbattle .r6:hover { background: #1c2220; }
+.game-starbattle .r7:hover { background: #22201c; }
+.game-starbattle .r8:hover { background: #1c201e; }
+.game-starbattle .r9:hover { background: #221c20; }
+
+/* size bar (reuses diff-btn style but gold active) */
+.game-starbattle .size-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.game-starbattle .size-btn:hover { border-color: #f5d03a; color: #f5d03a; }
+.game-starbattle .size-btn.active {
+  background: #f5d03a;
+  border-color: #f5d03a;
+  color: #000;
+  font-weight: 700;
+}
+
+/* counters */
+.sb-counters {
+  display: flex;
+  gap: 20px;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.sb-counter-val { color: #f5d03a; font-weight: 700; font-size: 18px; }
+
+/* legend */
+.sb-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  align-items: center;
+}
+.sb-legend-item { display: flex; align-items: center; gap: 5px; }
+
+/* tally */
+.star-tally {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  padding: 8px 0 0;
+  line-height: 1.8;
+}
+.tally-label { color: #f5d03a; font-weight: 600; }
+
+/* star battle action buttons — gold theme */
+.action-btn.sb-hint::before   { background: #3ab8f5; }
+.action-btn.sb-hint:hover     { border-color: #3ab8f5; color: #3ab8f5; }
+.action-btn.sb-solve::before  { background: #3af5a0; }
+.action-btn.sb-solve:hover    { border-color: #3af5a0; color: #3af5a0; }
+.action-btn.sb-verify::before { background: #f58c3a; }
+.action-btn.sb-verify:hover   { border-color: #f58c3a; color: #f58c3a; }
+.action-btn.sb-clear::before  { background: var(--wrong); }
+.action-btn.sb-clear:hover    { border-color: var(--wrong); color: var(--wrong); }
+
+/* star battle server badge */
+.game-starbattle .server-badge { padding: 0 0 4px; }
+
+/* star win overlay */
+#sb-win-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(11,11,15,0.93);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 20px;
+}
+#sb-win-overlay.show { display: flex; }
+.sb-win-stars {
+  font-size: 56px;
+  letter-spacing: 12px;
+  animation: winFloat 1.2s ease infinite alternate;
+  color: #f5d03a;
+}
+.sb-win-title {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(50px, 10vw, 88px);
+  font-weight: 900;
+  color: #f5d03a;
+  letter-spacing: -3px;
+  animation: winPop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+.sb-win-sub  { color: var(--muted); font-size: 12px; letter-spacing: 4px; text-transform: uppercase; }
+.sb-win-time { color: var(--accent2); font-size: 34px; letter-spacing: 6px; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -817,6 +1046,28 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
         <span class="card-tag">Prolog :8082</span>
         <span class="card-tag">Solver step</span>
         <span class="card-tag">Best times</span>
+      </div>
+      <div class="card-arrow">→</div>
+    </div>
+
+    <!-- Star Battle card -->
+    <div class="game-card star-card"
+         id="card-starbattle"
+         role="button"
+         tabindex="0"
+         onclick="showGame('starbattle')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showGame('starbattle')}">
+      <div class="card-icon" style="color:#f5d03a">★</div>
+      <div class="card-title">STAR<span style="color:#f5d03a"> ★ </span>BATTLE</div>
+      <div class="card-desc">
+        Regions · Constraints · Stars<br>
+        4 grid sizes · Prolog solver
+      </div>
+      <div class="card-tags">
+        <span class="card-tag">Prolog :8081</span>
+        <span class="card-tag">Hints</span>
+        <span class="card-tag">Auto-solve</span>
+        <span class="card-tag">Verify</span>
       </div>
       <div class="card-arrow">→</div>
     </div>
@@ -974,6 +1225,99 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
   <div class="status-toast" id="ms-status"></div>
 </section>
 
+<!-- ============================================================
+     STAR BATTLE GAME SECTION
+     ============================================================ -->
+<section id="game-starbattle" class="game-section game-starbattle">
+
+  <div class="back-bar">
+    <button class="back-btn" onclick="showMenu()">← Menu</button>
+  </div>
+
+  <header>
+    <div>
+      <div class="logo">STAR<span style="color:#f5d03a"> ★ </span>BATTLE</div>
+      <div class="subtitle">Powered by SWI-Prolog</div>
+    </div>
+    <div style="text-align:right">
+      <div class="timer" id="sb-timer">00:00</div>
+    </div>
+  </header>
+
+  <div style="position:relative;z-index:1;width:100%;max-width:960px;padding:0 24px;">
+    <div class="difficulty-bar">
+      <button class="size-btn active" data-size="5" onclick="StarBattle.setSize('5')">5×5 · 1★</button>
+      <button class="size-btn"        data-size="6" onclick="StarBattle.setSize('6')">6×6 · 1★</button>
+      <button class="size-btn"        data-size="7" onclick="StarBattle.setSize('7')">7×7 · 1★</button>
+      <button class="size-btn"        data-size="8" onclick="StarBattle.setSize('8')">8×8 · 1★</button>
+    </div>
+    <div class="server-badge">
+      <div class="server-dot" id="sb-server-dot"></div>
+      <span id="sb-server-label">Prolog — offline (JS fallback)</span>
+    </div>
+  </div>
+
+  <div class="game-main" style="max-width:960px;margin:0 auto;">
+    <div class="board-wrap" style="align-items:center;">
+      <div id="sb-board"></div>
+
+      <div class="sb-legend">
+        <div class="sb-legend-item"><span style="color:#f5d03a;font-size:13px">★</span> Star</div>
+        <div class="sb-legend-item"><span style="color:var(--muted);font-size:13px">✕</span> Eliminated</div>
+        <div class="sb-legend-item"><span style="font-size:9px">Left-click: place ·</span></div>
+        <div class="sb-legend-item"><span style="font-size:9px">Right-click: mark ✕</span></div>
+      </div>
+
+      <div class="sb-counters">
+        <div>
+          <div class="sb-counter-val" id="sb-cnt-stars">0</div>
+          <div>stars placed</div>
+        </div>
+        <div>
+          <div class="sb-counter-val" id="sb-cnt-needed">0</div>
+          <div>stars needed</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-panel">
+      <button class="action-btn new-game" onclick="StarBattle.newGame()">
+        <span class="btn-icon">⚡</span> New Puzzle
+      </button>
+      <div class="divider"></div>
+      <button class="action-btn sb-verify" onclick="StarBattle.verifyBoard()">
+        <span class="btn-icon">✓</span> Verify
+      </button>
+      <button class="action-btn sb-hint" onclick="StarBattle.getHint()">
+        <span class="btn-icon">◈</span> Hint
+      </button>
+      <button class="action-btn sb-solve" onclick="StarBattle.solveBoard()">
+        <span class="btn-icon">∞</span> Solve
+      </button>
+      <div class="divider"></div>
+      <button class="action-btn sb-clear" onclick="StarBattle.clearBoard()">
+        <span class="btn-icon">✕</span> Clear Board
+      </button>
+      <div class="star-tally" id="sb-tally"></div>
+    </div>
+  </div>
+
+  <!-- star win overlay -->
+  <div id="sb-win-overlay">
+    <div class="sb-win-stars">★ ★ ★</div>
+    <div class="sb-win-title">SOLVED!</div>
+    <div class="sb-win-time" id="sb-win-time">00:00</div>
+    <div class="sb-win-sub">Puzzle complete</div>
+    <br>
+    <button class="action-btn new-game" style="width:auto;"
+            onclick="StarBattle.newGame(); document.getElementById('sb-win-overlay').classList.remove('show')">
+      <span class="btn-icon">⚡</span> Play Again
+    </button>
+  </div>
+
+  <div class="status-toast" id="sb-status"></div>
+</section>
+
 
 <!-- ============================================================
      JAVASCRIPT
@@ -990,8 +1334,10 @@ function showMenu() {
   document.getElementById('main-menu').style.display = 'flex';
   document.getElementById('game-sudoku').classList.remove('active');
   document.getElementById('game-minesweeper').classList.remove('active');
+  document.getElementById('game-starbattle').classList.remove('active');
   if (activeGame === 'sudoku')      Sudoku.pause();
   if (activeGame === 'minesweeper') Minesweeper.pause();
+  if (activeGame === 'starbattle')  StarBattle.pause();
   activeGame = null;
 }
 
@@ -999,10 +1345,12 @@ function showGame(name) {
   document.getElementById('main-menu').style.display = 'none';
   document.getElementById('game-sudoku').classList.remove('active');
   document.getElementById('game-minesweeper').classList.remove('active');
+  document.getElementById('game-starbattle').classList.remove('active');
   document.getElementById('game-' + name).classList.add('active');
   activeGame = name;
   if (name === 'sudoku')      Sudoku.init();
   if (name === 'minesweeper') Minesweeper.init();
+  if (name === 'starbattle')  StarBattle.init();
 }
 
 // Global keyboard router: ESC → menu; key events → active game
@@ -1010,6 +1358,7 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape' && activeGame) { showMenu(); return; }
   if (activeGame === 'sudoku')      Sudoku.onKeydown(e);
   if (activeGame === 'minesweeper') Minesweeper.onKeydown(e);
+  if (activeGame === 'starbattle')  StarBattle.onKeydown(e);
 });
 
 
@@ -1865,6 +2214,537 @@ window.Minesweeper = (function() {
            solveStep: solveStep, onKeydown: onKeydown, pause: pause, hideOverlay: hideOverlay };
 
 })(); // end Minesweeper
+
+
+// ============================================================
+// ██████  STAR BATTLE MODULE
+// ============================================================
+window.StarBattle = (function() {
+
+  // ── Puzzle Library ────────────────────────────────────────
+  var PUZZLES = {
+    '5': [
+      { n:5, stars:1, regions:[[0,0,1,2,2],[0,1,1,2,2],[0,1,3,3,2],[0,4,3,3,2],[4,4,4,3,3]] },
+      { n:5, stars:1, regions:[[0,0,0,1,1],[0,2,0,1,1],[2,2,3,3,1],[2,4,4,3,1],[2,4,4,3,3]] },
+      { n:5, stars:1, regions:[[0,0,1,1,1],[0,2,2,1,3],[0,2,4,3,3],[0,2,4,4,3],[0,0,4,4,3]] }
+    ],
+    '6': [
+      { n:6, stars:1, regions:[[0,0,1,1,2,2],[0,0,1,1,2,2],[3,3,1,1,4,4],[3,3,5,5,4,4],[3,3,5,5,4,4],[3,3,5,5,4,4]] },
+      { n:6, stars:1, regions:[[0,0,1,1,2,2],[0,3,1,1,2,2],[0,3,3,4,4,2],[0,3,3,4,4,5],[0,0,3,4,5,5],[0,0,4,4,5,5]] },
+      { n:6, stars:1, regions:[[0,0,0,1,1,1],[0,2,2,2,1,3],[0,2,4,2,3,3],[0,4,4,2,3,5],[4,4,2,2,3,5],[4,4,5,5,5,5]] }
+    ],
+    '7': [
+      { n:7, stars:1, regions:[[0,0,1,1,2,2,2],[0,0,1,1,2,2,2],[0,0,1,1,3,3,3],[0,0,4,4,3,3,3],[5,5,4,4,3,3,3],[5,5,4,4,6,6,6],[5,5,4,4,6,6,6]] },
+      { n:7, stars:1, regions:[[0,0,0,1,1,1,1],[0,2,2,2,1,3,3],[0,2,4,2,3,3,3],[0,2,4,4,4,3,3],[5,5,4,4,6,6,3],[5,5,5,6,6,6,6],[5,5,5,5,6,6,6]] },
+      { n:7, stars:1, regions:[[0,0,0,0,1,1,1],[0,0,2,2,2,1,1],[3,3,2,2,4,4,1],[3,3,3,2,4,4,4],[3,5,5,2,2,6,4],[3,5,5,5,6,6,6],[5,5,5,6,6,6,6]] }
+    ],
+    '8': [
+      { n:8, stars:1, regions:[[0,0,1,1,1,2,2,2],[0,0,1,1,1,2,2,2],[0,0,1,1,3,3,2,2],[0,0,4,4,3,3,2,2],[0,0,4,4,3,3,5,5],[6,6,4,4,3,3,5,5],[6,6,7,7,3,3,5,5],[6,6,7,7,7,7,5,5]] },
+      { n:8, stars:1, regions:[[0,0,0,1,1,1,2,2],[0,0,1,1,1,2,2,2],[0,3,3,1,4,4,2,2],[0,3,3,3,4,4,4,5],[3,3,3,6,4,4,5,5],[3,7,7,6,6,4,5,5],[7,7,7,6,6,6,5,5],[7,7,6,6,6,6,5,5]] },
+      { n:8, stars:1, regions:[[0,0,0,0,1,1,1,1],[0,2,2,2,2,1,3,1],[0,2,4,4,2,3,3,3],[0,4,4,5,5,3,3,6],[0,4,5,5,5,6,6,6],[4,4,5,7,7,7,6,6],[4,7,7,7,7,7,6,6],[4,4,7,7,7,6,6,6]] }
+    ]
+  };
+
+  // ── JS Solver ─────────────────────────────────────────────
+  function solvePuzzle(n, stars, regions) {
+    var board = new Array(n * n).fill(0);
+    var regionIds = [];
+    var seen = {};
+    for (var r = 0; r < n; r++)
+      for (var c = 0; c < n; c++) {
+        var rid = regions[r][c];
+        if (!seen[rid]) { seen[rid] = true; regionIds.push(rid); }
+      }
+
+    function getRowStars(b, row) {
+      var cnt = 0;
+      for (var c = 0; c < n; c++) if (b[row*n+c] === 1) cnt++;
+      return cnt;
+    }
+    function getColStars(b, col) {
+      var cnt = 0;
+      for (var r = 0; r < n; r++) if (b[r*n+col] === 1) cnt++;
+      return cnt;
+    }
+    function getRegionStars(b, regId) {
+      var cnt = 0;
+      for (var r = 0; r < n; r++)
+        for (var c = 0; c < n; c++)
+          if (regions[r][c] === regId && b[r*n+c] === 1) cnt++;
+      return cnt;
+    }
+
+    var placed = [];
+    function isAdjacentToAny(r, c) {
+      for (var k = 0; k < placed.length; k++) {
+        var pr = placed[k][0], pc = placed[k][1];
+        if (Math.abs(r-pr) <= 1 && Math.abs(c-pc) <= 1) return true;
+      }
+      return false;
+    }
+
+    function combinations(arr, k) {
+      if (k === 0) return [[]];
+      if (arr.length < k) return [];
+      var first = arr[0], rest = arr.slice(1);
+      var withFirst = combinations(rest, k-1).map(function(c){ return [first].concat(c); });
+      var withoutFirst = combinations(rest, k);
+      return withFirst.concat(withoutFirst);
+    }
+
+    function solve(row) {
+      if (row === n) {
+        for (var c = 0; c < n; c++) if (getColStars(board, c) !== stars) return false;
+        for (var i = 0; i < regionIds.length; i++) if (getRegionStars(board, regionIds[i]) !== stars) return false;
+        return true;
+      }
+      var cols = [];
+      for (var c = 0; c < n; c++) cols.push(c);
+      var choices = combinations(cols, stars);
+      for (var ci = 0; ci < choices.length; ci++) {
+        var chosen = choices[ci];
+        for (var k = 0; k < chosen.length; k++) board[row*n+chosen[k]] = 1;
+        var valid = true;
+        for (var i = 0; i < chosen.length && valid; i++)
+          for (var j = i+1; j < chosen.length && valid; j++)
+            if (Math.abs(chosen[i]-chosen[j]) <= 1) valid = false;
+        if (valid) {
+          for (var k = 0; k < chosen.length && valid; k++)
+            if (isAdjacentToAny(row, chosen[k])) valid = false;
+        }
+        if (valid) {
+          for (var k = 0; k < chosen.length && valid; k++)
+            if (getColStars(board, chosen[k]) > stars) valid = false;
+        }
+        if (valid) {
+          for (var i = 0; i < regionIds.length && valid; i++)
+            if (getRegionStars(board, regionIds[i]) > stars) valid = false;
+        }
+        if (valid) {
+          for (var k = 0; k < chosen.length; k++) placed.push([row, chosen[k]]);
+          if (solve(row+1)) return true;
+          for (var k = 0; k < chosen.length; k++) placed.pop();
+        }
+        for (var k = 0; k < chosen.length; k++) board[row*n+chosen[k]] = 0;
+      }
+      return false;
+    }
+
+    if (solve(0)) return board;
+    return null;
+  }
+
+  // ── State ─────────────────────────────────────────────────
+  var N           = 5;
+  var STARS       = 1;
+  var REGIONS     = [];
+  var SOLUTION    = [];
+  var sbBoard     = [];
+  var timerSec    = 0;
+  var timerInt    = null;
+  var currentSize = '5';
+  var solved      = false;
+  var serverOnline = false;
+  var initialized  = false;
+  var statusTimer  = null;
+
+  var API_CANDIDATES = ['http://127.0.0.1:8081', 'http://localhost:8081'];
+  var API = API_CANDIDATES[0];
+
+  // ── Server ────────────────────────────────────────────────
+  async function checkServer() {
+    serverOnline = false;
+    for (var i = 0; i < API_CANDIDATES.length; i++) {
+      try {
+        var res = await fetch(API_CANDIDATES[i] + '/status', { signal: AbortSignal.timeout(1500) });
+        if (res.ok) { API = API_CANDIDATES[i]; serverOnline = true; break; }
+      } catch(e) {}
+    }
+    var dot   = document.getElementById('sb-server-dot');
+    var label = document.getElementById('sb-server-label');
+    if (dot)   dot.className     = 'server-dot' + (serverOnline ? ' online' : '');
+    if (label) label.textContent = serverOnline ? 'Prolog — online' : 'Prolog — offline (JS fallback)';
+  }
+
+  async function generateWithProlog(sizeKey) {
+    var res = await fetch(API + '/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ n: Number(sizeKey) })
+    });
+    if (!res.ok) throw new Error('Prolog generator failed');
+    var data = await res.json();
+    if (!data.success || !Array.isArray(data.regions) || !Array.isArray(data.solution))
+      throw new Error(data.error || 'Prolog could not generate puzzle');
+    return data;
+  }
+
+  async function solveWithProlog() {
+    var res = await fetch(API + '/solve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ n: N, stars: STARS, regions: REGIONS })
+    });
+    if (!res.ok) throw new Error('Prolog server failed');
+    var data = await res.json();
+    if (!data.success || !Array.isArray(data.solution)) throw new Error('No solution from Prolog');
+    return data.solution;
+  }
+
+  async function verifyWithProlog() {
+    var res = await fetch(API + '/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ n: N, stars: STARS, regions: REGIONS, current: sbBoard })
+    });
+    if (!res.ok) throw new Error('Prolog verify failed');
+    return await res.json();
+  }
+
+  async function hintWithProlog() {
+    var res = await fetch(API + '/hint', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ n: N, stars: STARS, regions: REGIONS, current: sbBoard })
+    });
+    if (!res.ok) throw new Error('Prolog hint failed');
+    return await res.json();
+  }
+
+  // ── Timer ─────────────────────────────────────────────────
+  function startTimer() {
+    timerInt = setInterval(function() {
+      timerSec++;
+      document.getElementById('sb-timer').textContent = formatTime(timerSec);
+    }, 1000);
+  }
+  function stopTimer()  { clearInterval(timerInt); timerInt = null; }
+  function pause()      { stopTimer(); }
+  function resetTimer() {
+    stopTimer(); timerSec = 0;
+    document.getElementById('sb-timer').textContent = '00:00';
+  }
+  function formatTime(s) {
+    return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+  }
+
+  // ── New Game ──────────────────────────────────────────────
+  async function newGame() {
+    solved = false;
+    document.getElementById('sb-win-overlay').classList.remove('show');
+    showStatus('Generating fresh puzzle with Prolog…', 'info');
+    await checkServer();
+    try {
+      if (!serverOnline) throw new Error('Prolog offline');
+      var generated = await generateWithProlog(currentSize);
+      N = generated.n; STARS = generated.stars;
+      REGIONS = generated.regions; SOLUTION = generated.solution;
+      sbBoard = new Array(N * N).fill(0);
+      showStatus('Fresh puzzle generated by Prolog', 'success');
+    } catch(err) {
+      var pool = PUZZLES[currentSize];
+      var puz  = pool[Math.floor(Math.random() * pool.length)];
+      N = puz.n; STARS = puz.stars; REGIONS = puz.regions;
+      sbBoard = new Array(N * N).fill(0);
+      SOLUTION = solvePuzzle(N, STARS, REGIONS);
+      showStatus('Prolog unavailable — using built-in fallback puzzle', 'warn');
+    }
+    resetTimer(); startTimer();
+    renderBoard(); updateCounters(); updateTally();
+  }
+
+  // ── Set Size ──────────────────────────────────────────────
+  function setSize(sz) {
+    currentSize = sz;
+    document.querySelectorAll('#game-starbattle .size-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.size === sz);
+    });
+    newGame();
+  }
+
+  // ── Render ────────────────────────────────────────────────
+  function renderBoard() {
+    var el = document.getElementById('sb-board');
+    el.style.gridTemplateColumns = 'repeat(' + N + ', var(--cell-size))';
+    el.style.gridTemplateRows    = 'repeat(' + N + ', var(--cell-size))';
+    el.innerHTML = '';
+    for (var r = 0; r < N; r++) {
+      for (var c = 0; c < N; c++) {
+        var idx = r * N + c;
+        var rid = REGIONS[r][c];
+        var cell = document.createElement('div');
+        cell.className = 'cell r' + (rid % 10);
+        cell.dataset.idx = idx;
+        cell.dataset.row = r;
+        cell.dataset.col = c;
+        if (r === 0 || REGIONS[r-1][c] !== rid) cell.classList.add('border-top');
+        if (r === N-1 || REGIONS[r+1] === undefined || REGIONS[r+1][c] !== rid) cell.classList.add('border-bottom');
+        if (c === 0 || REGIONS[r][c-1] !== rid) cell.classList.add('border-left');
+        if (c === N-1 || REGIONS[r][c+1] !== rid) cell.classList.add('border-right');
+        if (sbBoard[idx] === 1) cell.classList.add('starred');
+        if (sbBoard[idx] === 2) cell.classList.add('marked');
+        (function(i) {
+          cell.addEventListener('click',       function()  { cellClick(i); });
+          cell.addEventListener('contextmenu', function(e) { e.preventDefault(); cellRightClick(i); });
+        })(idx);
+        el.appendChild(cell);
+      }
+    }
+  }
+
+  function refreshCell(idx) {
+    var cell = document.querySelector('#sb-board .cell[data-idx="' + idx + '"]');
+    if (!cell) return;
+    cell.classList.remove('starred','marked','hint-star','solved-star','error-flash','verify-ok','verify-bad');
+    if (sbBoard[idx] === 1) cell.classList.add('starred');
+    if (sbBoard[idx] === 2) cell.classList.add('marked');
+  }
+
+  // ── Interaction ───────────────────────────────────────────
+  function cellClick(idx) {
+    if (solved) return;
+    if (sbBoard[idx] === 2 || sbBoard[idx] === 1) sbBoard[idx] = 0;
+    else sbBoard[idx] = 1;
+    if (sbBoard[idx] === 1) {
+      var r = Math.floor(idx/N), c = idx % N;
+      if (!checkCell(r, c)) flashError(idx);
+    }
+    refreshCell(idx); updateCounters(); updateTally(); checkWin();
+  }
+
+  function cellRightClick(idx) {
+    if (solved) return;
+    if (sbBoard[idx] === 1) return;
+    sbBoard[idx] = sbBoard[idx] === 2 ? 0 : 2;
+    refreshCell(idx);
+  }
+
+  function checkCell(r, c) {
+    var rowCount = 0, colCount = 0, regCount = 0;
+    var rid = REGIONS[r][c];
+    for (var cc = 0; cc < N; cc++) if (sbBoard[r*N+cc] === 1) rowCount++;
+    if (rowCount > STARS) return false;
+    for (var rr = 0; rr < N; rr++) if (sbBoard[rr*N+c] === 1) colCount++;
+    if (colCount > STARS) return false;
+    for (var rr = 0; rr < N; rr++)
+      for (var cc = 0; cc < N; cc++)
+        if (REGIONS[rr][cc] === rid && sbBoard[rr*N+cc] === 1) regCount++;
+    if (regCount > STARS) return false;
+    for (var dr = -1; dr <= 1; dr++)
+      for (var dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        var nr = r+dr, nc = c+dc;
+        if (nr >= 0 && nr < N && nc >= 0 && nc < N && sbBoard[nr*N+nc] === 1) return false;
+      }
+    return true;
+  }
+
+  function flashError(idx) {
+    var cell = document.querySelector('#sb-board .cell[data-idx="' + idx + '"]');
+    if (!cell) return;
+    cell.classList.add('error-flash');
+    setTimeout(function(){ cell.classList.remove('error-flash'); }, 350);
+  }
+
+  // ── Counters + Tally ──────────────────────────────────────
+  function updateCounters() {
+    var placed = sbBoard.filter(function(v){ return v === 1; }).length;
+    document.getElementById('sb-cnt-stars').textContent  = placed;
+    document.getElementById('sb-cnt-needed').textContent = N * STARS;
+  }
+
+  function updateTally() {
+    var lines = [];
+    var rowOk = [];
+    for (var r = 0; r < N; r++) {
+      var cnt = 0;
+      for (var c = 0; c < N; c++) if (sbBoard[r*N+c] === 1) cnt++;
+      rowOk.push(cnt === STARS ? '✓' : cnt + '/' + STARS);
+    }
+    lines.push('<span class="tally-label">Rows:</span> ' + rowOk.join(' '));
+    var colOk = [];
+    for (var c = 0; c < N; c++) {
+      var cnt = 0;
+      for (var r = 0; r < N; r++) if (sbBoard[r*N+c] === 1) cnt++;
+      colOk.push(cnt === STARS ? '✓' : cnt + '/' + STARS);
+    }
+    lines.push('<span class="tally-label">Cols:</span> ' + colOk.join(' '));
+    var rids = [];
+    var seen = {};
+    for (var r = 0; r < N; r++)
+      for (var c = 0; c < N; c++) {
+        var rid = REGIONS[r][c];
+        if (!seen[rid]) { seen[rid] = true; rids.push(rid); }
+      }
+    rids.sort(function(a,b){ return a-b; });
+    var regOk = rids.map(function(rid) {
+      var cnt = 0;
+      for (var r = 0; r < N; r++)
+        for (var c = 0; c < N; c++)
+          if (REGIONS[r][c] === rid && sbBoard[r*N+c] === 1) cnt++;
+      return cnt === STARS ? '✓' : cnt + '/' + STARS;
+    });
+    lines.push('<span class="tally-label">Regs:</span> ' + regOk.join(' '));
+    document.getElementById('sb-tally').innerHTML = lines.join('<br>');
+  }
+
+  // ── Win Check ─────────────────────────────────────────────
+  function checkWin() {
+    if (!SOLUTION || SOLUTION.length === 0) return;
+    var placed = sbBoard.filter(function(v){ return v === 1; }).length;
+    if (placed !== N * STARS) return;
+    for (var i = 0; i < N * N; i++) {
+      if ((sbBoard[i] === 1) !== (SOLUTION[i] === 1)) return;
+    }
+    solved = true;
+    stopTimer();
+    document.getElementById('sb-win-time').textContent = formatTime(timerSec);
+    setTimeout(function(){ document.getElementById('sb-win-overlay').classList.add('show'); }, 400);
+  }
+
+  // ── Verify ────────────────────────────────────────────────
+  async function verifyBoard() {
+    if (!SOLUTION || SOLUTION.length === 0) { showStatus('No solution available', 'error'); return; }
+    var starCells = [];
+    for (var i = 0; i < N*N; i++) if (sbBoard[i] === 1) starCells.push(i);
+    if (starCells.length === 0) { showStatus('Place some stars first!', 'warn'); return; }
+    await checkServer();
+    if (serverOnline) {
+      try {
+        var data = await verifyWithProlog();
+        if (data.success && Array.isArray(data.solution)) SOLUTION = data.solution;
+      } catch(e) {}
+    }
+    document.querySelectorAll('#sb-board .cell.verify-ok, #sb-board .cell.verify-bad').forEach(function(c) {
+      c.classList.remove('verify-ok', 'verify-bad');
+    });
+    var correct = 0, wrong = 0;
+    starCells.forEach(function(idx) {
+      var cell = document.querySelector('#sb-board .cell[data-idx="' + idx + '"]');
+      if (!cell) return;
+      if (SOLUTION[idx] === 1) { cell.classList.add('verify-ok'); correct++; }
+      else                     { cell.classList.add('verify-bad'); wrong++; }
+    });
+    if (wrong === 0 && correct === N * STARS) {
+      showStatus('✓ All ' + correct + ' stars correct — well done!', 'success');
+    } else if (wrong === 0) {
+      showStatus('✓ ' + correct + ' correct so far, keep going!', 'success');
+    } else {
+      showStatus('✗ ' + wrong + ' wrong star' + (wrong>1?'s':'') + ', ' + correct + ' correct', 'error');
+    }
+    setTimeout(function() {
+      document.querySelectorAll('#sb-board .cell.verify-ok, #sb-board .cell.verify-bad').forEach(function(c) {
+        c.classList.remove('verify-ok', 'verify-bad');
+      });
+    }, 2500);
+  }
+
+  // ── Hint ──────────────────────────────────────────────────
+  async function getHint() {
+    if (!SOLUTION || SOLUTION.length === 0) { showStatus('No solution available', 'error'); return; }
+    await checkServer();
+    var idx = -1;
+    if (serverOnline) {
+      try {
+        var data = await hintWithProlog();
+        if (data.success && Array.isArray(data.solution)) SOLUTION = data.solution;
+        if (data.success) idx = data.index;
+      } catch(e) {}
+    }
+    if (idx < 0) {
+      var missing = [];
+      for (var i = 0; i < N*N; i++) if (SOLUTION[i] === 1 && sbBoard[i] !== 1) missing.push(i);
+      if (missing.length === 0) { showStatus('All stars already placed!', 'success'); return; }
+      idx = missing[Math.floor(Math.random() * missing.length)];
+    }
+    sbBoard[idx] = 1;
+    var cell = document.querySelector('#sb-board .cell[data-idx="' + idx + '"]');
+    if (cell) {
+      cell.classList.remove('marked','starred','error-flash');
+      cell.classList.add('hint-star');
+      setTimeout(function() { cell.classList.remove('hint-star'); cell.classList.add('starred'); }, 1200);
+    }
+    updateCounters(); updateTally();
+    showStatus('◈ Hint: star revealed at row ' + (Math.floor(idx/N)+1) + ', col ' + ((idx%N)+1), 'info');
+    checkWin();
+  }
+
+  // ── Solve ─────────────────────────────────────────────────
+  async function solveBoard() {
+    if (!SOLUTION || SOLUTION.length === 0) { showStatus('No solution computed', 'error'); return; }
+    var elapsedTime = formatTime(timerSec);
+    stopTimer();
+    document.getElementById('sb-win-time').textContent = elapsedTime;
+    var toReveal = [];
+    for (var i = 0; i < N*N; i++) if (SOLUTION[i] === 1 && sbBoard[i] !== 1) toReveal.push(i);
+    for (var i = 0; i < N*N; i++) if (SOLUTION[i] !== 1 && sbBoard[i] === 1) { sbBoard[i] = 0; refreshCell(i); }
+    if (toReveal.length === 0) {
+      showStatus('Board already solved!', 'success');
+      setTimeout(function(){ document.getElementById('sb-win-overlay').classList.add('show'); }, 400);
+      return;
+    }
+    var k = 0;
+    var interval = setInterval(function() {
+      if (k >= toReveal.length) {
+        clearInterval(interval); solved = true;
+        updateCounters(); updateTally();
+        document.getElementById('sb-win-time').textContent = elapsedTime;
+        showStatus('∞ Solved by Prolog logic!', 'success');
+        setTimeout(function(){ document.getElementById('sb-win-overlay').classList.add('show'); }, 700);
+        return;
+      }
+      var idx = toReveal[k++];
+      sbBoard[idx] = 1;
+      var cell = document.querySelector('#sb-board .cell[data-idx="' + idx + '"]');
+      if (cell) {
+        cell.classList.remove('marked','starred','hint-star','error-flash');
+        cell.classList.add('solved-star');
+        setTimeout(function(el){ el.classList.remove('solved-star'); el.classList.add('starred'); }, 600, cell);
+      }
+      updateCounters(); updateTally();
+    }, Math.max(80, 400 / toReveal.length));
+  }
+
+  // ── Clear Board ───────────────────────────────────────────
+  function clearBoard() {
+    sbBoard = new Array(N * N).fill(0);
+    solved = false;
+    renderBoard(); updateCounters(); updateTally();
+    resetTimer(); startTimer();
+    showStatus('Board cleared', 'info');
+  }
+
+  // ── Keyboard ──────────────────────────────────────────────
+  function onKeydown(e) {
+    if (e.key === 'n' || e.key === 'N') newGame();
+    if (e.key === 'c' || e.key === 'C') clearBoard();
+    if (e.key === 'h' || e.key === 'H') getHint();
+  }
+
+  // ── Status ────────────────────────────────────────────────
+  function showStatus(msg, type) {
+    type = type || 'info';
+    var el = document.getElementById('sb-status');
+    el.textContent = msg;
+    el.className   = 'status-toast show ' + type;
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(function(){ el.className = 'status-toast'; }, 3000);
+  }
+
+  // ── Init ──────────────────────────────────────────────────
+  function init() {
+    if (!initialized) {
+      initialized = true;
+      setInterval(checkServer, 10000);
+    }
+    newGame();
+  }
+
+  return { init: init, newGame: newGame, setSize: setSize,
+           verifyBoard: verifyBoard, getHint: getHint, solveBoard: solveBoard,
+           clearBoard: clearBoard, onKeydown: onKeydown, pause: pause };
+
+})(); // end StarBattle
 </script>
 </body>
 </html>
