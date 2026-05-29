@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -610,12 +610,32 @@ header {
   font-size: clamp(16px, 3vw, 22px);
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
-.num-btn:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+.num-btn:hover:not(.exhausted) { background: var(--accent); color: #000; border-color: var(--accent); }
+
+/* number fully placed on board — grey out */
+.num-btn.exhausted {
+  opacity: 0.22;
+  cursor: not-allowed;
+  pointer-events: none;
+  text-decoration: line-through;
+  border-color: transparent;
+}
+
+/* nudge: warn user to click a cell first */
+@keyframes nudge {
+  0%,100% { transform: translateX(0) scale(1); }
+  20%      { transform: translateX(-5px) scale(1.08); }
+  40%      { transform: translateX(5px)  scale(1.08); }
+  60%      { transform: translateX(-3px); }
+  80%      { transform: translateX(3px); }
+}
+.num-btn.nudge { animation: nudge 0.45s ease; border-color: var(--wrong); color: var(--wrong); }
 
 /* pencil toggle */
 .pencil-toggle {
@@ -655,14 +675,28 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
 #sk-win-overlay {
   display: none;
   position: fixed; inset: 0;
-  background: rgba(14,14,16,0.92);
+  background: rgba(14,14,16,0.88);
   z-index: 200;
   align-items: center;
   justify-content: center;
   flex-direction: column;
   gap: 24px;
+  overflow: hidden;
 }
 #sk-win-overlay.show { display: flex; }
+
+/* canvas sits behind the text content */
+#sk-win-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* push win text above canvas */
+#sk-win-overlay > *:not(canvas) { position: relative; z-index: 1; }
 
 .win-title {
   font-family: 'Fraunces', serif;
@@ -671,9 +705,93 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
   color: var(--accent);
   letter-spacing: -4px;
   animation: winPop 0.6s cubic-bezier(0.34,1.56,0.64,1);
+  text-shadow: 0 0 40px rgba(200,241,53,0.6);
 }
 .win-sub  { color: var(--muted); font-size: 14px; letter-spacing: 3px; }
 .win-time { color: var(--accent2); font-size: 32px; letter-spacing: 4px; }
+
+/* ── End-Game Modal ──────────────────────────────────────── */
+.sk-modal-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(8,8,12,0.82);
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+}
+.sk-modal-backdrop.open { display: flex; }
+
+.sk-modal {
+  background: #17171d;
+  border: 1px solid var(--border);
+  padding: 40px 44px 36px;
+  max-width: 440px;
+  width: 92%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: fadeInUp 0.35s ease both;
+  position: relative;
+}
+
+.sk-modal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.sk-modal-title.complete   { color: var(--correct); }
+.sk-modal-title.incomplete { color: var(--wrong); }
+.sk-modal-title.checking   { color: var(--hint); }
+
+.sk-modal-body {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  line-height: 1.8;
+  text-transform: uppercase;
+}
+
+.sk-modal-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.sk-modal-btn {
+  flex: 1;
+  min-width: 110px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sk-modal-btn:hover          { border-color: var(--accent); color: var(--accent); }
+.sk-modal-btn.primary        { border-color: var(--accent); color: var(--accent); }
+.sk-modal-btn.primary:hover  { background: var(--accent); color: #000; }
+.sk-modal-btn.danger         { border-color: var(--wrong);  color: var(--wrong); }
+.sk-modal-btn.danger:hover   { background: var(--wrong);  color: #000; }
+.sk-modal-btn.subtle         { border-color: var(--border); color: var(--muted); }
+
+/* spinner for Prolog check */
+@keyframes spin { to { transform: rotate(360deg); } }
+.sk-spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--hint);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
 
 /* =====================================================
    MINESWEEPER-SPECIFIC
@@ -1136,18 +1254,39 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
       <button class="action-btn solve" onclick="Sudoku.solveBoard()">
         <span class="btn-icon">∞</span> Solve
       </button>
+      <div class="divider"></div>
+      <button class="action-btn" id="sk-endgame-btn"
+              style="--stripe:var(--accent2)"
+              onclick="Sudoku.openEndGame()">
+        <span class="btn-icon">▣</span> End Game
+      </button>
     </div>
   </div>
 
   <!-- win overlay -->
   <div id="sk-win-overlay">
-    <div class="win-title">SOLVED</div>
+    <canvas id="sk-win-canvas"></canvas>
+    <div class="win-title">SOLVED!</div>
     <div class="win-time" id="sk-win-time">00:00</div>
     <div class="win-sub">PUZZLE COMPLETE</div>
     <button class="action-btn new-game" style="width:auto;"
             onclick="Sudoku.newGame(); document.getElementById('sk-win-overlay').classList.remove('show')">
       <span class="btn-icon">⚡</span> Play Again
     </button>
+  </div>
+
+  <!-- end-game modal -->
+  <div class="sk-modal-backdrop" id="sk-endgame-modal">
+    <div class="sk-modal">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="sk-spinner" id="sk-modal-spinner"></div>
+        <div class="sk-modal-title checking" id="sk-modal-title">Checking…</div>
+      </div>
+      <div class="sk-modal-body" id="sk-modal-body">Asking Prolog to verify your solution…</div>
+      <div class="sk-modal-actions" id="sk-modal-actions" style="display:none">
+        <!-- buttons injected by JS -->
+      </div>
+    </div>
   </div>
 
   <div class="status-toast" id="sk-status"></div>
@@ -1320,6 +1459,23 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
 
 
 <!-- ============================================================
+     GLOBAL: LEAVE-CONFIRM MODAL (all games)
+     ============================================================ -->
+<div class="sk-modal-backdrop" id="leave-confirm-modal">
+  <div class="sk-modal">
+    <div class="sk-modal-title incomplete" style="font-size:26px">Game in Progress</div>
+    <div class="sk-modal-body">
+      You have an unfinished game.<br>
+      Are you sure you want to leave?
+    </div>
+    <div class="sk-modal-actions">
+      <button class="sk-modal-btn danger" id="leave-confirm-yes">Leave anyway</button>
+      <button class="sk-modal-btn subtle" onclick="document.getElementById('leave-confirm-modal').classList.remove('open')">Stay</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
      JAVASCRIPT
      ============================================================ -->
 <script>
@@ -1329,8 +1485,9 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
 // NAVIGATION
 // ============================================================
 let activeGame = null;
+let _pendingGame = null;
 
-function showMenu() {
+function _doShowMenu() {
   document.getElementById('main-menu').style.display = 'flex';
   document.getElementById('game-sudoku').classList.remove('active');
   document.getElementById('game-minesweeper').classList.remove('active');
@@ -1341,7 +1498,10 @@ function showMenu() {
   activeGame = null;
 }
 
-function showGame(name) {
+// back-button and ESC always work freely
+function showMenu() { _doShowMenu(); }
+
+function _doShowGame(name) {
   document.getElementById('main-menu').style.display = 'none';
   document.getElementById('game-sudoku').classList.remove('active');
   document.getElementById('game-minesweeper').classList.remove('active');
@@ -1353,9 +1513,37 @@ function showGame(name) {
   if (name === 'starbattle')  StarBattle.init();
 }
 
-// Global keyboard router: ESC → menu; key events → active game
+// called by menu cards — intercepts if another game is currently active
+function showGame(name) {
+  if (activeGame === name) return;
+  var currentlyActive = false;
+  if (activeGame === 'sudoku')      currentlyActive = Sudoku.isActive();
+  if (activeGame === 'minesweeper') currentlyActive = Minesweeper.isActive();
+  if (activeGame === 'starbattle')  currentlyActive = StarBattle.isActive();
+  if (currentlyActive) {
+    _pendingGame = name;
+    var modal = document.getElementById('leave-confirm-modal');
+    modal.classList.add('open');
+    document.getElementById('leave-confirm-yes').onclick = function() {
+      modal.classList.remove('open');
+      _doShowGame(_pendingGame);
+      _pendingGame = null;
+    };
+    return;
+  }
+  _doShowGame(name);
+}
+
+// Global keyboard router
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape' && activeGame) { showMenu(); return; }
+  if (e.key === 'Escape') {
+    var openModals = document.querySelectorAll('.sk-modal-backdrop.open');
+    if (openModals.length > 0) {
+      openModals.forEach(function(m) { m.classList.remove('open'); });
+      return;
+    }
+    if (activeGame) { showMenu(); return; }
+  }
   if (activeGame === 'sudoku')      Sudoku.onKeydown(e);
   if (activeGame === 'minesweeper') Minesweeper.onKeydown(e);
   if (activeGame === 'starbattle')  StarBattle.onKeydown(e);
@@ -1445,6 +1633,7 @@ window.Sudoku = (function() {
   var difficulty  = 'easy';
   var serverOnline = false;
   var initialized  = false;
+  var gameOver     = false;   // true once won or End Game confirmed
   var serverCheckInterval = null;
 
   var API = 'http://localhost:8080';
@@ -1472,6 +1661,7 @@ window.Sudoku = (function() {
 
   // ── New Game ────────────────────────────────────────────────
   function newGame() {
+    gameOver = false;
     showStatus('Generating puzzle…', 'info');
     setTimeout(function() {
       var gen  = generatePuzzle(difficulty);
@@ -1483,6 +1673,7 @@ window.Sudoku = (function() {
       resetTimer();
       startTimer();
       renderBoard();
+      updateNumpadExhausted();
     }, 30);
   }
 
@@ -1575,32 +1766,88 @@ window.Sudoku = (function() {
     for (var n = 1; n <= 9; n++) {
       var btn = document.createElement('button');
       btn.className   = 'num-btn';
+      btn.id          = 'sk-num-' + n;
       btn.textContent = n;
       (function(num){ btn.addEventListener('click', function(){ enterNumber(num); }); })(n);
       np.appendChild(btn);
     }
   }
 
+  // Feature 1: grey out numpad buttons when a digit fills all 9 positions
+  // Uses Prolog /count when online, falls back to JS counting
+  async function updateNumpadExhausted() {
+    var counts = [0,0,0,0,0,0,0,0,0]; // index 0 = digit 1
+    if (serverOnline) {
+      try {
+        var res = await fetch(API + '/count', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ board: board }),
+          signal: AbortSignal.timeout(800)
+        });
+        if (res.ok) {
+          var data = await res.json();
+          if (data.success && Array.isArray(data.counts)) {
+            counts = data.counts; // Prolog returns [c1,c2,...,c9]
+          }
+        }
+      } catch(e) {
+        // fall through to JS counting below
+      }
+    }
+    // JS fallback: count occurrences in the current board
+    if (!serverOnline || counts.every(function(c){ return c === 0; })) {
+      counts = [0,0,0,0,0,0,0,0,0];
+      board.forEach(function(v) { if (v >= 1 && v <= 9) counts[v-1]++; });
+    }
+    for (var d = 1; d <= 9; d++) {
+      var btn = document.getElementById('sk-num-' + d);
+      if (btn) btn.classList.toggle('exhausted', counts[d-1] >= 9);
+    }
+  }
+
+  // Feature 2 + 5: cell-first warning + rollback on same number
   function enterNumber(n) {
-    if (selected === -1 || puzzle[selected] !== 0) return;
+    // Feature 2: no cell selected — nudge the button and warn
+    if (selected === -1) {
+      var btn = document.getElementById('sk-num-' + n);
+      if (btn) {
+        btn.classList.remove('nudge');
+        void btn.offsetWidth; // force reflow to restart animation
+        btn.classList.add('nudge');
+        setTimeout(function(){ btn.classList.remove('nudge'); }, 500);
+      }
+      showStatus('⚠️ Click a cell first, then choose a number!', 'warn');
+      return;
+    }
+    if (puzzle[selected] !== 0) return; // given cell
     if (pencilMode) {
       if (notes[selected].has(n)) notes[selected].delete(n);
       else notes[selected].add(n);
       board[selected] = 0;
     } else {
-      notes[selected].clear();
-      board[selected] = n;
+      // Feature 5: clicking the same number clears the cell (rollback)
+      if (board[selected] === n) {
+        board[selected] = 0;
+        notes[selected].clear();
+      } else {
+        notes[selected].clear();
+        board[selected] = n;
+      }
     }
     renderBoard();
+    updateNumpadExhausted();
   }
 
   function onKeydown(e) {
+    if (gameOver) return;
     if (e.key >= '1' && e.key <= '9') { enterNumber(+e.key); return; }
     if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
       if (selected !== -1 && puzzle[selected] === 0) {
         board[selected] = 0;
         notes[selected].clear();
         renderBoard();
+        updateNumpadExhausted();
       }
       return;
     }
@@ -1679,6 +1926,7 @@ window.Sudoku = (function() {
     board[idx] = val;
     notes[idx].clear();
     renderBoard();
+    updateNumpadExhausted();
     flashCell(idx, 'hint-flash');
     showStatus('◈ Hint: ' + val + ' placed', 'info');
   }
@@ -1693,16 +1941,16 @@ window.Sudoku = (function() {
           body: JSON.stringify({ puzzle: puzzle })
         });
         var data = await res.json();
-        if (data.success) { solution = data.solution; animateSolve(data.solution); return; }
+        if (data.success) { solution = data.solution; animateSolve(data.solution, false); return; }
       } catch(e) {}
     }
     showStatus('Solving locally…', 'info');
     setTimeout(function() {
-      localSolve(puzzle, function(sol) { solution = sol; animateSolve(sol); });
+      localSolve(puzzle, function(sol) { solution = sol; animateSolve(sol, false); });
     }, 50);
   }
 
-  function animateSolve(sol) {
+  function animateSolve(sol, triggerWin) {
     stopTimer();
     var empties = [];
     sol.forEach(function(v, i){ if (puzzle[i] === 0) empties.push({i:i, v:v}); });
@@ -1710,7 +1958,9 @@ window.Sudoku = (function() {
     var interval = setInterval(function() {
       if (k >= empties.length) {
         clearInterval(interval);
-        showStatus('∞ Puzzle solved by Prolog!', 'success');
+        updateNumpadExhausted();
+        if (triggerWin) { onWin(); }
+        else { showStatus('∞ Puzzle solved by Prolog!', 'success'); }
         return;
       }
       var item = empties[k++];
@@ -1721,11 +1971,72 @@ window.Sudoku = (function() {
     }, 20);
   }
 
-  // ── Win ────────────────────────────────────────────────────
+  // ── Win (Feature 6: Canvas particle animation) ─────────────
   function onWin() {
+    gameOver = true;
     stopTimer();
     document.getElementById('sk-win-time').textContent = formatTime(timerSec);
     document.getElementById('sk-win-overlay').classList.add('show');
+    launchWinCanvas();
+  }
+
+  function launchWinCanvas() {
+    var canvas = document.getElementById('sk-win-canvas');
+    var W = canvas.width  = window.innerWidth;
+    var H = canvas.height = window.innerHeight;
+    var ctx = canvas.getContext('2d');
+    var digits  = ['1','2','3','4','5','6','7','8','9'];
+    var palette = ['#c8f135','#f1c835','#35c8f1','#f13550','#35f1a0','#f17b35','#c835f1','#35f1c8','#f135c8'];
+    var particles = [];
+
+    for (var i = 0; i < 80; i++) {
+      particles.push({
+        x:  Math.random() * W,
+        y:  -20 - Math.random() * H * 0.5,
+        vx: (Math.random() - 0.5) * 2.5,
+        vy: 1.5 + Math.random() * 3.5,
+        rot: Math.random() * Math.PI * 2,
+        rotV: (Math.random() - 0.5) * 0.18,
+        size: 18 + Math.random() * 28,
+        digit: digits[Math.floor(Math.random() * digits.length)],
+        color: palette[Math.floor(Math.random() * palette.length)],
+        alpha: 1,
+        decay: 0.004 + Math.random() * 0.003
+      });
+    }
+
+    var start = performance.now();
+    var DURATION = 4500;
+
+    function frame(now) {
+      var elapsed = now - start;
+      ctx.clearRect(0, 0, W, H);
+      var alive = false;
+      particles.forEach(function(p) {
+        p.x   += p.vx;
+        p.y   += p.vy;
+        p.vy  += 0.06;  // gravity
+        p.rot += p.rotV;
+        if (elapsed > DURATION * 0.6) p.alpha -= p.decay;
+        if (p.alpha <= 0) return;
+        alive = true;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.font = 'bold ' + p.size + 'px Fraunces, serif';
+        ctx.fillStyle = p.color;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur  = 12;
+        ctx.textAlign   = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(p.digit, 0, 0);
+        ctx.restore();
+      });
+      if (alive && elapsed < DURATION + 1000) requestAnimationFrame(frame);
+      else ctx.clearRect(0, 0, W, H);
+    }
+    requestAnimationFrame(frame);
   }
 
   // ── Timer ──────────────────────────────────────────────────
@@ -1740,6 +2051,8 @@ window.Sudoku = (function() {
   function stopTimer()  { clearInterval(timerInt); timerInt = null; }
   function resetTimer() { stopTimer(); timerSec = 0; document.getElementById('sk-timer').textContent = '00:00'; }
   function pause()      { stopTimer(); }
+  // Feature 4 helper: is there an active, unfinished game?
+  function isActive()   { return puzzle.length > 0 && !gameOver && board.some(function(v,i){ return puzzle[i]===0 && v===0; }); }
   function formatTime(s) {
     return Math.floor(s/60).toString().padStart(2,'0') + ':' + (s%60).toString().padStart(2,'0');
   }
@@ -1750,6 +2063,87 @@ window.Sudoku = (function() {
     if (!cell) return;
     cell.classList.add(cls);
     setTimeout(function(){ cell.classList.remove(cls); }, 700);
+  }
+
+  // -- Feature 3: End Game modal --
+  async function openEndGame() {
+    var modal   = document.getElementById('sk-endgame-modal');
+    var titleEl = document.getElementById('sk-modal-title');
+    var bodyEl  = document.getElementById('sk-modal-body');
+    var actEl   = document.getElementById('sk-modal-actions');
+    var spinner = document.getElementById('sk-modal-spinner');
+    titleEl.className     = 'sk-modal-title checking';
+    titleEl.textContent   = 'Checking...';
+    bodyEl.textContent    = serverOnline ? 'Asking Prolog to verify...' : 'Analysing your board...';
+    actEl.style.display   = 'none';
+    spinner.style.display = 'block';
+    modal.classList.add('open');
+    stopTimer();
+    var empties = 0, wrongs = 0;
+    var localSol = solution.slice();
+    if (serverOnline) {
+      try {
+        var res = await fetch(API + '/verify', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ puzzle: puzzle, current: board }),
+          signal: AbortSignal.timeout(3000)
+        });
+        var data = await res.json();
+        if (data.success && Array.isArray(data.results)) {
+          data.results.forEach(function(r) {
+            if (r.status === 'empty') empties++;
+            else if (r.status === 'incorrect') wrongs++;
+          });
+          if (Array.isArray(data.solution)) localSol = data.solution;
+          renderResult(); return;
+        }
+      } catch(e) {}
+    }
+    if (localSol.length === 0) { var tmp = puzzle.slice(); if (solve(tmp)) localSol = tmp; }
+    board.forEach(function(v, i) {
+      if (puzzle[i] !== 0) return;
+      if (v === 0) empties++; else if (v !== localSol[i]) wrongs++;
+    });
+    renderResult();
+    function renderResult() {
+      spinner.style.display = 'none';
+      actEl.innerHTML = ''; actEl.style.display = 'flex';
+      var isComplete = empties === 0 && wrongs === 0;
+      if (isComplete) {
+        titleEl.className = 'sk-modal-title complete';
+        titleEl.textContent = 'COMPLETE!';
+        bodyEl.textContent = 'Your puzzle is fully and correctly solved!';
+        var btn = document.createElement('button');
+        btn.className = 'sk-modal-btn primary'; btn.textContent = 'Celebrate!';
+        btn.onclick = function() { modal.classList.remove('open'); gameOver = true; onWin(); };
+        actEl.appendChild(btn);
+      } else {
+        titleEl.className = 'sk-modal-title incomplete';
+        titleEl.textContent = 'INCOMPLETE';
+        var lines = [];
+        if (empties > 0) lines.push(empties + ' cell' + (empties > 1 ? 's' : '') + ' empty');
+        if (wrongs  > 0) lines.push(wrongs  + ' cell' + (wrongs  > 1 ? 's' : '') + ' wrong');
+        bodyEl.textContent = lines.join(' / ');
+        var solBtn = document.createElement('button');
+        solBtn.className = 'sk-modal-btn primary'; solBtn.textContent = 'See Solution';
+        solBtn.onclick = function() {
+          modal.classList.remove('open'); gameOver = true;
+          if (serverOnline) {
+            fetch(API + '/solve', { method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ puzzle: puzzle })
+            }).then(function(r){ return r.json(); }).then(function(d){
+              if (d.success) { solution = d.solution; animateSolve(d.solution, false); }
+              else { animateSolve(localSol, false); }
+            }).catch(function(){ animateSolve(localSol, false); });
+          } else { animateSolve(localSol, false); }
+        };
+        var keepBtn = document.createElement('button');
+        keepBtn.className = 'sk-modal-btn subtle'; keepBtn.textContent = 'Keep Playing';
+        keepBtn.onclick = function() { modal.classList.remove('open'); startTimer(); };
+        actEl.appendChild(solBtn); actEl.appendChild(keepBtn);
+      }
+    }
   }
 
   function showStatus(msg, type) {
@@ -1776,7 +2170,8 @@ window.Sudoku = (function() {
 
   return { init: init, newGame: newGame, setDiff: setDiff,
            verifyBoard: verifyBoard, getHint: getHint, solveBoard: solveBoard,
-           onKeydown: onKeydown, pause: pause };
+           openEndGame: openEndGame,
+           onKeydown: onKeydown, pause: pause, isActive: isActive };
 
 })(); // end Sudoku
 
@@ -1844,6 +2239,7 @@ window.Minesweeper = (function() {
   }
   function stopTimer()  { clearInterval(timerInt); }
   function pause()      { stopTimer(); }
+  function isActive()   { return gameState === 'playing'; }
   function resetTimer() {
     stopTimer();
     timerSec = 0;
@@ -2211,7 +2607,8 @@ window.Minesweeper = (function() {
 
   return { init: init, newGame: newGame, setDiff: setDiff,
            toggleFlagMode: toggleFlagMode, toggleQmarkMode: toggleQmarkMode,
-           solveStep: solveStep, onKeydown: onKeydown, pause: pause, hideOverlay: hideOverlay };
+           solveStep: solveStep, onKeydown: onKeydown, pause: pause,
+           hideOverlay: hideOverlay, isActive: isActive };
 
 })(); // end Minesweeper
 
@@ -2420,6 +2817,7 @@ window.StarBattle = (function() {
   }
   function stopTimer()  { clearInterval(timerInt); timerInt = null; }
   function pause()      { stopTimer(); }
+  function isActive()   { return N > 0 && !solved && sbBoard.some(function(v){ return v === 0; }); }
   function resetTimer() {
     stopTimer(); timerSec = 0;
     document.getElementById('sb-timer').textContent = '00:00';
@@ -2742,7 +3140,7 @@ window.StarBattle = (function() {
 
   return { init: init, newGame: newGame, setSize: setSize,
            verifyBoard: verifyBoard, getHint: getHint, solveBoard: solveBoard,
-           clearBoard: clearBoard, onKeydown: onKeydown, pause: pause };
+           clearBoard: clearBoard, onKeydown: onKeydown, pause: pause, isActive: isActive };
 
 })(); // end StarBattle
 </script>
