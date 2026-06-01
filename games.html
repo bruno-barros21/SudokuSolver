@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1108,6 +1108,40 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
 }
 .sb-win-sub  { color: var(--muted); font-size: 12px; letter-spacing: 4px; text-transform: uppercase; }
 .sb-win-time { color: var(--accent2); font-size: 34px; letter-spacing: 6px; font-variant-numeric: tabular-nums; }
+
+/* ==========================================
+   2048 CSS (PREMIUM)
+   ========================================== */
+#game-2048 { display: none; flex-direction: column; align-items: center; padding-top: 40px; --cell-size: clamp(50px, 12vw, 90px); --gap-size: clamp(8px, 2vw, 15px); }
+#game-2048.active { display: flex; }
+.g2048-header { display: flex; justify-content: space-between; width: calc((var(--cell-size) * 4) + (var(--gap-size) * 5)); margin-bottom: 30px; }
+.g2048-score-container { display: flex; gap: 15px; }
+.g2048-score-box { background: #333; padding: 10px 20px; border-radius: 8px; text-align: center; }
+.g2048-score-box .label { color: #eee; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; font-weight: 600; }
+.g2048-score-box .val { color: #fff; font-size: 1.5rem; font-weight: bold; }
+.g2048-btn { background: #8f7a66; color: white; border: none; padding: 10px 25px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+.g2048-btn:hover { background: #9f8a76; }
+.board-2048 { position: relative; background: #bbada0; padding: var(--gap-size); border-radius: 6px; display: grid; grid-template-columns: repeat(4, var(--cell-size)); grid-template-rows: repeat(4, var(--cell-size)); gap: var(--gap-size); }
+.cell-2048 { background: rgba(238, 228, 218, 0.35); border-radius: 3px; }
+#g2048-tiles { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
+.g-tile { position: absolute; width: var(--cell-size); height: var(--cell-size); border-radius: 3px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif; transition: top 0.15s ease-in-out, left 0.15s ease-in-out; }
+@keyframes winPop { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+.g-tile.pop { animation: winPop 0.25s ease-out forwards; }
+.tile-2 { background: #eee4da; color: #776e65; font-size: calc(var(--cell-size) * 0.5); }
+.tile-4 { background: #ede0c8; color: #776e65; font-size: calc(var(--cell-size) * 0.5); }
+.tile-8 { background: #f2b179; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.5); }
+.tile-16 { background: #f59563; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.45); }
+.tile-32 { background: #f67c5f; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.45); }
+.tile-64 { background: #f65e3b; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.45); }
+.tile-128 { background: #edcf72; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.4); box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.2381), inset 0 0 0 1px rgba(255, 255, 255, 0.14286); }
+.tile-256 { background: #edcc61; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.4); box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.31746), inset 0 0 0 1px rgba(255, 255, 255, 0.19048); }
+.tile-512 { background: #edc850; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.4); box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.39683), inset 0 0 0 1px rgba(255, 255, 255, 0.2381); }
+.tile-1024 { background: #edc53f; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.35); box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.47619), inset 0 0 0 1px rgba(255, 255, 255, 0.28571); }
+.tile-2048 { background: #edc22e; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.35); box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.55556), inset 0 0 0 1px rgba(255, 255, 255, 0.33333); }
+.g2048-server-status { display: flex; align-items: center; gap: 8px; margin-top: 25px; font-size: 0.9rem; color: #aaa; background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 20px; }
+
+.card-bubble { position: absolute; top: 20px; right: 20px; background: rgba(237, 194, 46, 0.15); border: 1px solid rgba(237, 194, 46, 0.4); color: #edc22e; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; animation: floatBubble 2.5s ease-in-out infinite; pointer-events: none; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+@keyframes floatBubble { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 </style>
 </head>
 <body>
@@ -1190,6 +1224,26 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
       <div class="card-arrow">→</div>
     </div>
 
+    <!-- 2048 card -->
+    <div class="game-card" style="--accent: #edc22e;"
+         id="card-2048"
+         role="button"
+         tabindex="0"
+         onclick="showGame('2048')"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showGame('2048')}">
+      <div class="card-bubble">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+        Requer localhost:8083
+      </div>
+      <div class="card-icon">2048</div>
+      <div class="card-title">2048</div>
+      <div class="card-desc">Slide and merge tiles to reach 2048.</div>
+      <div class="card-tags">
+        <span class="card-tag">Prolog :8083</span>
+      </div>
+      <div class="card-arrow">→</div>
+    </div>
+
   </div>
 
   <div class="menu-footer">v2.0 · Prolog Arcade · ESC to return to menu at any time</div>
@@ -1198,6 +1252,37 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
 <!-- ============================================================
      SUDOKU GAME SECTION
      ============================================================ -->
+  <!-- 2048 SECTION -->
+  <section id="game-2048" class="game-section">
+    <div class="g2048-header">
+      <button class="g2048-btn" onclick="Game2048.newGame()">New Game</button>
+      <div class="g2048-score-container">
+        <div class="g2048-score-box"><div class="label">Score</div><div class="val" id="g2048-score">0</div></div>
+        <div class="g2048-score-box"><div class="label">Best</div><div class="val" id="g2048-best">0</div></div>
+      </div>
+    </div>
+    <div class="board-2048" id="g2048-board">
+      <div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div>
+      <div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div>
+      <div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div>
+      <div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div>
+      <div id="g2048-tiles"></div>
+    </div>
+    <div class="g2048-server-status">
+      <div id="g2048-server-dot" class="server-dot"></div>
+      <span id="g2048-server-label">Prolog :8083</span>
+    </div>
+    <div id="g2048-overlay" class="sk-modal-backdrop" style="background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);">
+      <div class="sk-modal" style="background: linear-gradient(135deg, #2a2a35, #1f1f28); border: 1px solid rgba(255,255,255,0.1);">
+        <div id="g2048-modal-title" class="sk-modal-title" style="color: #edc22e; font-size: 2rem;">Game Over!</div>
+        <div class="sk-modal-body" id="g2048-modal-body" style="color: #ccc; font-size: 1.1rem;">No more moves possible.</div>
+        <div class="sk-modal-footer">
+          <button class="g2048-btn" onclick="document.getElementById('g2048-overlay').classList.remove('open'); Game2048.newGame();">Try Again</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
 <section id="game-sudoku" class="game-section game-sudoku">
 
   <div class="back-bar">
@@ -1492,6 +1577,7 @@ function _doShowMenu() {
   document.getElementById('game-sudoku').classList.remove('active');
   document.getElementById('game-minesweeper').classList.remove('active');
   document.getElementById('game-starbattle').classList.remove('active');
+  document.getElementById('game-2048').classList.remove('active');
   if (activeGame === 'sudoku')      Sudoku.pause();
   if (activeGame === 'minesweeper') Minesweeper.pause();
   if (activeGame === 'starbattle')  StarBattle.pause();
@@ -1506,11 +1592,13 @@ function _doShowGame(name) {
   document.getElementById('game-sudoku').classList.remove('active');
   document.getElementById('game-minesweeper').classList.remove('active');
   document.getElementById('game-starbattle').classList.remove('active');
+  document.getElementById('game-2048').classList.remove('active');
   document.getElementById('game-' + name).classList.add('active');
   activeGame = name;
   if (name === 'sudoku')      Sudoku.init();
   if (name === 'minesweeper') Minesweeper.init();
   if (name === 'starbattle')  StarBattle.init();
+  if (name === '2048')        Game2048.init();
 }
 
 // called by menu cards — intercepts if another game is currently active
@@ -1520,6 +1608,7 @@ function showGame(name) {
   if (activeGame === 'sudoku')      currentlyActive = Sudoku.isActive();
   if (activeGame === 'minesweeper') currentlyActive = Minesweeper.isActive();
   if (activeGame === 'starbattle')  currentlyActive = StarBattle.isActive();
+  if (activeGame === '2048')        currentlyActive = Game2048.isActive();
   if (currentlyActive) {
     _pendingGame = name;
     var modal = document.getElementById('leave-confirm-modal');
@@ -1547,6 +1636,7 @@ document.addEventListener('keydown', function(e) {
   if (activeGame === 'sudoku')      Sudoku.onKeydown(e);
   if (activeGame === 'minesweeper') Minesweeper.onKeydown(e);
   if (activeGame === 'starbattle')  StarBattle.onKeydown(e);
+  if (activeGame === '2048')        Game2048.onKeydown(e);
 });
 
 
@@ -3144,5 +3234,158 @@ window.StarBattle = (function() {
 
 })(); // end StarBattle
 </script>
+
+<script>
+// ============================================================
+// 2048 MODULE (PROLOG BACKEND)
+// ============================================================
+window.Game2048 = (function() {
+  var board = [];
+  var score = 0;
+  var bestScore = localStorage.getItem('2048_best') || 0;
+  var gameOver = false;
+  var serverOnline = false;
+  var initialized = false;
+
+  var API = 'http://localhost:8083';
+
+  function updateServerStatus() {
+    var dot = document.getElementById('g2048-server-dot');
+    var lbl = document.getElementById('g2048-server-label');
+    if (dot) dot.className = 'server-dot ' + (serverOnline ? 'online' : '');
+    if (lbl) lbl.textContent = 'Prolog :8083 (' + (serverOnline ? 'Online' : 'Offline') + ')';
+  }
+
+  async function checkServer() {
+    try {
+      var res = await fetch(API + '/new', { method: 'POST' }); 
+      serverOnline = res.ok;
+    } catch (e) {
+      serverOnline = false;
+    }
+    updateServerStatus();
+  }
+
+  function updateScore() {
+    document.getElementById('g2048-score').textContent = score;
+    if (score > bestScore) {
+      bestScore = score;
+      localStorage.setItem('2048_best', bestScore);
+    }
+    document.getElementById('g2048-best').textContent = bestScore;
+  }
+
+  function renderBoard() {
+    var container = document.getElementById('g2048-tiles');
+    container.innerHTML = '';
+    for (var i = 0; i < 16; i++) {
+      var val = board[i];
+      if (val > 0) {
+        var r = Math.floor(i / 4);
+        var c = i % 4;
+        var div = document.createElement('div');
+        div.className = 'g-tile tile-' + val;
+        div.textContent = val;
+        div.style.top = 'calc(' + r + ' * (var(--cell-size) + var(--gap-size)) + var(--gap-size))';
+        div.style.left = 'calc(' + c + ' * (var(--cell-size) + var(--gap-size)) + var(--gap-size))';
+        div.dataset.idx = i;
+        container.appendChild(div);
+      }
+    }
+  }
+
+  function renderSpawns(spawns) {
+    if (!spawns || !Array.isArray(spawns)) return;
+    spawns.forEach(function(s) {
+      if (s.index < 0) return;
+      var r = Math.floor(s.index / 4);
+      var c = s.index % 4;
+      var div = document.createElement('div');
+      div.className = 'g-tile tile-' + s.value + ' pop';
+      div.textContent = s.value;
+      div.style.top = 'calc(' + r + ' * (var(--cell-size) + var(--gap-size)) + var(--gap-size))';
+      div.style.left = 'calc(' + c + ' * (var(--cell-size) + var(--gap-size)) + var(--gap-size))';
+      document.getElementById('g2048-tiles').appendChild(div);
+    });
+  }
+
+  async function newGame() {
+    score = 0;
+    gameOver = false;
+    updateScore();
+    document.getElementById('g2048-overlay').classList.remove('open');
+    board = new Array(16).fill(0);
+    renderBoard();
+    
+    if (!serverOnline) await checkServer();
+    if (!serverOnline) {
+      alert("Prolog server is offline! Please start it on port 8083.");
+      return;
+    }
+
+    try {
+      var res = await fetch(API + '/new', { method: 'POST' });
+      var data = await res.json();
+      if (data.success) {
+        board = data.board;
+        renderBoard();
+        renderSpawns(data.spawns);
+      }
+    } catch(e) {
+      serverOnline = false;
+      updateServerStatus();
+    }
+  }
+
+  async function move(direction) {
+    if (gameOver || !serverOnline) return;
+    try {
+      var res = await fetch(API + '/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ board: board, direction: direction })
+      });
+      var data = await res.json();
+      if (data.success && data.changed) {
+        board = data.board;
+        score += data.score;
+        updateScore();
+        renderBoard();
+        if (data.spawn_idx >= 0) {
+          renderSpawns([{ index: data.spawn_idx, value: data.spawn_val }]);
+        }
+        if (data.game_over) {
+          gameOver = true;
+          document.getElementById('g2048-overlay').classList.add('open');
+        }
+      }
+    } catch(e) {
+      serverOnline = false;
+      updateServerStatus();
+    }
+  }
+
+  function onKeydown(e) {
+    if (gameOver) return;
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { e.preventDefault(); move('up'); }
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { e.preventDefault(); move('down'); }
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { e.preventDefault(); move('left'); }
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { e.preventDefault(); move('right'); }
+  }
+
+  function isActive() { return !gameOver && board.some(function(v){ return v > 0; }); }
+  function pause() {}
+
+  function init() {
+    if (!initialized) {
+      initialized = true;
+      setInterval(checkServer, 10000);
+      updateScore();
+    }
+    checkServer().then(function(){ newGame(); });
+  }
+
+  return { init: init, newGame: newGame, onKeydown: onKeydown, isActive: isActive, pause: pause };
+})();
+</script>
 </body>
-</html>
