@@ -353,6 +353,7 @@ flat_to_rows(Flat, N, [Row|Rows]) :-
 :- use_module(library(http/http_json)).
 :- use_module(library(http/http_cors)).
 :- use_module(library(http/http_files)).
+:- use_module(library(http/http_client)).
 
 :- set_setting(http:cors, [*]).
 

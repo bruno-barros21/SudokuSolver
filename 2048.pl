@@ -4,6 +4,7 @@
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_json)).
 :- use_module(library(http/http_cors)).
+:- use_module(library(http/http_client)).
 :- use_module(library(clpfd)).
 :- use_module(library(random)).
 :- use_module(library(lists)).

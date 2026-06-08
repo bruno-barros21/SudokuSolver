@@ -104,6 +104,7 @@ find_hint([_|Cs], [_|Ss], Idx, HintIdx, HintVal) :-
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_json)).
 :- use_module(library(http/http_cors)).
+:- use_module(library(http/http_client)).
 
 :- set_setting(http:cors, [*]).
 
