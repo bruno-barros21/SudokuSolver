@@ -107,16 +107,29 @@ find_hint([_|Cs], [_|Ss], Idx, HintIdx, HintVal) :-
 
 :- set_setting(http:cors, [*]).
 
-:- http_handler(root(solve),   handle_solve,   [method(post)]).
-:- http_handler(root(verify),  handle_verify,  [method(post)]).
-:- http_handler(root(hint),    handle_hint,    [method(post)]).
-:- http_handler(root(.),       handle_index,   []).
+:- http_handler(root(solve),   route_solve,   []).
+:- http_handler(root(verify),  route_verify,  []).
+:- http_handler(root(hint),    route_hint,    []).
+:- http_handler(root(.),       handle_index,  []).
 
 start_server(Port) :-
     http_server(http_dispatch, [port(Port)]).
 
 handle_index(Request) :-
     http_reply_file('index.html', [], Request).
+
+handle_options(Request) :-
+    cors_enable(Request, [methods([get, post, options])]),
+    format('Content-type: text/plain~n~n').
+
+route_solve(Request) :- member(method(options), Request), !, handle_options(Request).
+route_solve(Request) :- handle_solve(Request).
+
+route_verify(Request) :- member(method(options), Request), !, handle_options(Request).
+route_verify(Request) :- handle_verify(Request).
+
+route_hint(Request) :- member(method(options), Request), !, handle_options(Request).
+route_hint(Request) :- handle_hint(Request).
 
 % POST /solve  { "puzzle": [0,5,0,...] }
 handle_solve(Request) :-
@@ -170,6 +183,6 @@ find_hint_cells([_|Cs], [_|Ss], Idx, HintIdx, HintVal) :-
 
 :- initialization(main, main).
 main :-
-    start_server(8081),
-    format("Sudoku server running on http://localhost:8081~n"),
+    start_server(8080),
+    format("Sudoku server running on http://localhost:8080~n"),
     thread_get_message(_).

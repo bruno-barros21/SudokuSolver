@@ -356,12 +356,12 @@ flat_to_rows(Flat, N, [Row|Rows]) :-
 
 :- set_setting(http:cors, [*]).
 
-:- http_handler(root(status), handle_status, [method(get)]).
-:- http_handler(root(solve),  handle_http_solve,  [method(post)]).
-:- http_handler(root(generate), handle_http_generate, [method(post)]).
-:- http_handler(root(verify), handle_http_verify, [method(post)]).
-:- http_handler(root(hint),   handle_http_hint,   [method(post)]).
-:- http_handler(root(.),      handle_index,       []).
+:- http_handler(root(status),   route_status,   []).
+:- http_handler(root(solve),     route_solve,    []).
+:- http_handler(root(generate),  route_generate, []).
+:- http_handler(root(verify),    route_verify,   []).
+:- http_handler(root(hint),      route_hint,     []).
+:- http_handler(root(.),         handle_index,   []).
 
 start_server(Port) :-
     http_server(http_dispatch, [port(Port)]).
@@ -369,10 +369,28 @@ start_server(Port) :-
 handle_index(Request) :-
     http_reply_file('star.html', [], Request).
 
+handle_options(Request) :-
+    cors_enable(Request, [methods([get, post, options])]),
+    format('Content-type: text/plain~n~n').
+
+route_status(Request) :- member(method(options), Request), !, handle_options(Request).
+route_status(Request) :- handle_status(Request).
+
+route_solve(Request) :- member(method(options), Request), !, handle_options(Request).
+route_solve(Request) :- handle_http_solve(Request).
+
+route_generate(Request) :- member(method(options), Request), !, handle_options(Request).
+route_generate(Request) :- handle_http_generate(Request).
+
+route_verify(Request) :- member(method(options), Request), !, handle_options(Request).
+route_verify(Request) :- handle_http_verify(Request).
+
+route_hint(Request) :- member(method(options), Request), !, handle_options(Request).
+route_hint(Request) :- handle_http_hint(Request).
+
 handle_status(_Request) :-
     cors_enable,
     reply_json_dict(_{success:true, engine:"SWI-Prolog Star Battle solver"}).
-
 
 % POST /generate  { "n": 5 }
 handle_http_generate(Request) :-

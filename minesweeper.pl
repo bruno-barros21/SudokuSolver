@@ -139,7 +139,7 @@ deduce_mines(Board, Rows, Cols, SafeCells, MineCells) :-
 
 :- set_setting(http:cors, [*]).
 
-:- http_handler(root(analyse), handle_analyse, [method(post)]).
+:- http_handler(root(analyse), route_analyse, []).
 :- http_handler(root(.),       handle_index,   []).
 
 start_server(Port) :-
@@ -147,6 +147,13 @@ start_server(Port) :-
 
 handle_index(Request) :-
     http_reply_file('minesweeper.html', [], Request).
+
+handle_options(Request) :-
+    cors_enable(Request, [methods([get, post, options])]),
+    format('Content-type: text/plain~n~n').
+
+route_analyse(Request) :- member(method(options), Request), !, handle_options(Request).
+route_analyse(Request) :- handle_analyse(Request).
 
 % POST /analyse
 % Request body: { "board": [...], "rows": N, "cols": N }

@@ -423,6 +423,8 @@ header {
   align-items: flex-start;
   gap: 16px;
   overflow-x: auto;
+  /* Prevent the board from collapsing or shifting when the grid is set */
+  min-width: 0;
 }
 
 /* side panel */
@@ -796,11 +798,24 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
 /* =====================================================
    MINESWEEPER-SPECIFIC
    ===================================================== */
+#game-minesweeper .back-bar,
+#game-minesweeper header,
+#game-minesweeper .game-main {
+  max-width: 1600px; 
+  width: 100%;
+}
+#game-minesweeper .game-main  { margin: 0 auto; }
+#game-minesweeper .board-wrap { align-items: center; justify-content: center; }
+
 #ms-board {
   display: grid;
   border: 2px solid var(--given);
   gap: 0;
   flex-shrink: 0;
+  /* Size is set explicitly in JS via gridTemplateColumns/Rows — this prevents layout shifts */
+  width: max-content;
+  min-width: max-content;
+  box-sizing: content-box;
 }
 
 .game-minesweeper .cell {
@@ -1110,38 +1125,136 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
 .sb-win-time { color: var(--accent2); font-size: 34px; letter-spacing: 6px; font-variant-numeric: tabular-nums; }
 
 /* ==========================================
-   2048 CSS (PREMIUM)
+   2048 CSS
    ========================================== */
-#game-2048 { display: none; flex-direction: column; align-items: center; padding-top: 40px; --cell-size: clamp(50px, 12vw, 90px); --gap-size: clamp(8px, 2vw, 15px); }
+#game-2048 {
+  display: none; flex-direction: column; align-items: center;
+  padding: 40px 20px 60px;
+  --cell-size: clamp(60px, 13vw, 100px);
+  --gap-size:  clamp(8px,  1.8vw, 14px);
+  --board-w:   calc(var(--cell-size)*4 + var(--gap-size)*5);
+  font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif;
+}
 #game-2048.active { display: flex; }
-.g2048-header { display: flex; justify-content: space-between; width: calc((var(--cell-size) * 4) + (var(--gap-size) * 5)); margin-bottom: 30px; }
-.g2048-score-container { display: flex; gap: 15px; }
-.g2048-score-box { background: #333; padding: 10px 20px; border-radius: 8px; text-align: center; }
-.g2048-score-box .label { color: #eee; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; font-weight: 600; }
-.g2048-score-box .val { color: #fff; font-size: 1.5rem; font-weight: bold; }
-.g2048-btn { background: #8f7a66; color: white; border: none; padding: 10px 25px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: background 0.2s; }
-.g2048-btn:hover { background: #9f8a76; }
-.board-2048 { position: relative; background: #bbada0; padding: var(--gap-size); border-radius: 6px; display: grid; grid-template-columns: repeat(4, var(--cell-size)); grid-template-rows: repeat(4, var(--cell-size)); gap: var(--gap-size); }
-.cell-2048 { background: rgba(238, 228, 218, 0.35); border-radius: 3px; }
-#g2048-tiles { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
-.g-tile { position: absolute; width: var(--cell-size); height: var(--cell-size); border-radius: 3px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif; transition: top 0.15s ease-in-out, left 0.15s ease-in-out; }
-@keyframes winPop { 0% { transform: scale(0.5); opacity: 0; } 70% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
-.g-tile.pop { animation: winPop 0.25s ease-out forwards; }
-.tile-2 { background: #eee4da; color: #776e65; font-size: calc(var(--cell-size) * 0.5); }
-.tile-4 { background: #ede0c8; color: #776e65; font-size: calc(var(--cell-size) * 0.5); }
-.tile-8 { background: #f2b179; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.5); }
-.tile-16 { background: #f59563; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.45); }
-.tile-32 { background: #f67c5f; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.45); }
-.tile-64 { background: #f65e3b; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.45); }
-.tile-128 { background: #edcf72; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.4); box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.2381), inset 0 0 0 1px rgba(255, 255, 255, 0.14286); }
-.tile-256 { background: #edcc61; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.4); box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.31746), inset 0 0 0 1px rgba(255, 255, 255, 0.19048); }
-.tile-512 { background: #edc850; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.4); box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.39683), inset 0 0 0 1px rgba(255, 255, 255, 0.2381); }
-.tile-1024 { background: #edc53f; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.35); box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.47619), inset 0 0 0 1px rgba(255, 255, 255, 0.28571); }
-.tile-2048 { background: #edc22e; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.35); box-shadow: 0 0 30px 10px rgba(243, 215, 116, 0.55556), inset 0 0 0 1px rgba(255, 255, 255, 0.33333); }
-.g2048-server-status { display: flex; align-items: center; gap: 8px; margin-top: 25px; font-size: 0.9rem; color: #aaa; background: rgba(0,0,0,0.3); padding: 8px 16px; border-radius: 20px; }
 
-.card-bubble { position: absolute; top: 20px; right: 20px; background: rgba(237, 194, 46, 0.15); border: 1px solid rgba(237, 194, 46, 0.4); color: #edc22e; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; animation: floatBubble 2.5s ease-in-out infinite; pointer-events: none; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-@keyframes floatBubble { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+/* Top nav bar */
+.g2048-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  width: var(--board-w); margin-bottom: 10px;
+}
+.g2048-back-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
+  color: #bbb; padding: 7px 16px; border-radius: 8px;
+  font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  transition: background 0.2s, color 0.2s; letter-spacing: 0.03em;
+}
+.g2048-back-btn:hover { background: rgba(255,255,255,0.13); color: #fff; }
+.g2048-back-btn svg { flex-shrink: 0; }
+
+/* Title + score row */
+.g2048-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  width: var(--board-w); margin-bottom: 14px;
+}
+.g2048-title {
+  font-size: clamp(2rem, 6vw, 3.2rem);
+  font-weight: 800; color: #f9f6f2; line-height: 1;
+  letter-spacing: -1px;
+}
+.g2048-score-container { display: flex; gap: 8px; }
+.g2048-score-box {
+  background: #bbada0; color: #f9f6f2;
+  padding: 8px 18px; border-radius: 4px; text-align: center;
+  min-width: 64px;
+}
+.g2048-score-box .label {
+  font-size: 0.65rem; text-transform: uppercase;
+  letter-spacing: 1px; font-weight: 700; opacity: 0.8; margin-bottom: 2px;
+}
+.g2048-score-box .val { font-size: 1.35rem; font-weight: 800; }
+
+/* Action buttons row */
+.g2048-actions {
+  display: flex; gap: 8px; align-items: center;
+  width: var(--board-w); margin-bottom: 16px;
+}
+.g2048-btn {
+  background: #8f7a66; color: #f9f6f2; border: none;
+  padding: 9px 22px; border-radius: 4px;
+  font-size: 0.9rem; font-weight: 700; cursor: pointer;
+  letter-spacing: 0.03em; transition: background 0.18s;
+}
+.g2048-btn:hover { background: #a08878; }
+.g2048-hint-text {
+  font-size: 0.82rem; color: #888;
+  flex: 1; text-align: right;
+}
+
+/* Board */
+.board-2048 {
+  position: relative; background: #bbada0;
+  padding: var(--gap-size); border-radius: 6px;
+  display: grid;
+  grid-template-columns: repeat(4, var(--cell-size));
+  grid-template-rows:    repeat(4, var(--cell-size));
+  gap: var(--gap-size);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+}
+.cell-2048 { background: rgba(238,228,218,0.35); border-radius: 3px; }
+#g2048-tiles { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
+
+/* Tiles */
+.g-tile {
+  position: absolute;
+  width: var(--cell-size); height: var(--cell-size);
+  border-radius: 3px; display: flex;
+  justify-content: center; align-items: center;
+  font-weight: 800;
+  font-family: "Clear Sans", "Helvetica Neue", Arial, sans-serif;
+  transition: top 0.12s ease, left 0.12s ease;
+}
+@keyframes tileAppear { 0% { transform: scale(0); opacity:0; } 60% { transform: scale(1.1); } 100% { transform: scale(1); opacity:1; } }
+.g-tile.pop { animation: tileAppear 0.2s ease-out forwards; }
+.tile-2    { background: #eee4da; color: #776e65; font-size: calc(var(--cell-size) * 0.50); }
+.tile-4    { background: #ede0c8; color: #776e65; font-size: calc(var(--cell-size) * 0.50); }
+.tile-8    { background: #f2b179; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.50); }
+.tile-16   { background: #f59563; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.45); }
+.tile-32   { background: #f67c5f; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.45); }
+.tile-64   { background: #f65e3b; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.45); }
+.tile-128  { background: #edcf72; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.40); box-shadow: 0 0 30px 8px rgba(243,215,116,0.24), inset 0 0 0 1px rgba(255,255,255,0.14); }
+.tile-256  { background: #edcc61; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.40); box-shadow: 0 0 30px 8px rgba(243,215,116,0.32), inset 0 0 0 1px rgba(255,255,255,0.19); }
+.tile-512  { background: #edc850; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.40); box-shadow: 0 0 30px 8px rgba(243,215,116,0.40), inset 0 0 0 1px rgba(255,255,255,0.24); }
+.tile-1024 { background: #edc53f; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.35); box-shadow: 0 0 30px 8px rgba(243,215,116,0.48), inset 0 0 0 1px rgba(255,255,255,0.29); }
+.tile-2048 { background: #edc22e; color: #f9f6f2; font-size: calc(var(--cell-size) * 0.35); box-shadow: 0 0 30px 8px rgba(243,215,116,0.56), inset 0 0 0 1px rgba(255,255,255,0.33); }
+
+/* Hint text below board */
+.g2048-keyboard-hint {
+  margin-top: 20px; color: #555;
+  font-size: 0.8rem; letter-spacing: 0.04em;
+  display: flex; gap: 10px; align-items: center;
+}
+.g2048-keyboard-hint kbd {
+  background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px; padding: 2px 7px; font-size: 0.8rem; color: #888;
+}
+
+/* Server status */
+.g2048-server-status {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 18px; font-size: 0.8rem; color: #666;
+}
+.server-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
+.server-dot.online { background: #34d399; box-shadow: 0 0 6px #34d399; }
+
+/* Card server status pill */
+.card-server-pill { position: absolute; top: 16px; right: 16px; display: flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em; border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(6px); pointer-events: none; transition: background 0.4s, color 0.4s; background: rgba(255,255,255,0.06); color: #888; }
+.card-server-pill .pill-dot { width: 7px; height: 7px; border-radius: 50%; background: #555; flex-shrink: 0; transition: background 0.4s, box-shadow 0.4s; }
+.card-server-pill.online { background: rgba(52, 211, 153, 0.12); color: #34d399; border-color: rgba(52,211,153,0.25); }
+.card-server-pill.online .pill-dot { background: #34d399; box-shadow: 0 0 6px #34d399; animation: pillPulse 2s ease-in-out infinite; }
+.card-server-pill.offline { background: rgba(239, 68, 68, 0.10); color: #f87171; border-color: rgba(239,68,68,0.2); }
+.card-server-pill.offline .pill-dot { background: #f87171; }
+@keyframes pillPulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
 </style>
 </head>
 <body>
@@ -1166,6 +1279,7 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
          tabindex="0"
          onclick="showGame('sudoku')"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showGame('sudoku')}">
+      <div class="card-server-pill" id="pill-sudoku"><span class="pill-dot"></span><span class="pill-label">:8080</span></div>
       <div class="card-icon">⬛</div>
       <div class="card-title">SUDOKU</div>
       <div class="card-desc">
@@ -1188,6 +1302,7 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
          tabindex="0"
          onclick="showGame('minesweeper')"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showGame('minesweeper')}">
+      <div class="card-server-pill" id="pill-minesweeper"><span class="pill-dot"></span><span class="pill-label">:8082</span></div>
       <div class="card-icon">✸</div>
       <div class="card-title">MINE<span style="color:var(--wrong)">sweeper</span></div>
       <div class="card-desc">
@@ -1209,6 +1324,7 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
          tabindex="0"
          onclick="showGame('starbattle')"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showGame('starbattle')}">
+      <div class="card-server-pill" id="pill-starbattle"><span class="pill-dot"></span><span class="pill-label">:8081</span></div>
       <div class="card-icon" style="color:#f5d03a">★</div>
       <div class="card-title">STAR<span style="color:#f5d03a"> ★ </span>BATTLE</div>
       <div class="card-desc">
@@ -1231,10 +1347,7 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
          tabindex="0"
          onclick="showGame('2048')"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showGame('2048')}">
-      <div class="card-bubble">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
-        Requer localhost:8083
-      </div>
+      <div class="card-server-pill" id="pill-2048"><span class="pill-dot"></span><span class="pill-label">:8083</span></div>
       <div class="card-icon">2048</div>
       <div class="card-title">2048</div>
       <div class="card-desc">Slide and merge tiles to reach 2048.</div>
@@ -1254,13 +1367,35 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
      ============================================================ -->
   <!-- 2048 SECTION -->
   <section id="game-2048" class="game-section">
+
+    <!-- Back to menu -->
+    <nav class="g2048-nav">
+      <button class="g2048-back-btn" onclick="showMenu()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Menu
+      </button>
+      <div class="g2048-server-status">
+        <div id="g2048-server-dot" class="server-dot"></div>
+        <span id="g2048-server-label">Prolog :8083</span>
+      </div>
+    </nav>
+
+    <!-- Title + Scores -->
     <div class="g2048-header">
-      <button class="g2048-btn" onclick="Game2048.newGame()">New Game</button>
+      <div class="g2048-title">2048</div>
       <div class="g2048-score-container">
         <div class="g2048-score-box"><div class="label">Score</div><div class="val" id="g2048-score">0</div></div>
         <div class="g2048-score-box"><div class="label">Best</div><div class="val" id="g2048-best">0</div></div>
       </div>
     </div>
+
+    <!-- Actions -->
+    <div class="g2048-actions">
+      <button class="g2048-btn" onclick="Game2048.newGame()">New Game</button>
+      <span class="g2048-hint-text">Use arrow keys or WASD</span>
+    </div>
+
+    <!-- Board -->
     <div class="board-2048" id="g2048-board">
       <div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div>
       <div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div>
@@ -1268,16 +1403,22 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
       <div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div><div class="cell-2048"></div>
       <div id="g2048-tiles"></div>
     </div>
-    <div class="g2048-server-status">
-      <div id="g2048-server-dot" class="server-dot"></div>
-      <span id="g2048-server-label">Prolog :8083</span>
+
+    <!-- Keyboard hint -->
+    <div class="g2048-keyboard-hint">
+      <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd>
+      ou
+      <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>
     </div>
+
+    <!-- Game Over overlay -->
     <div id="g2048-overlay" class="sk-modal-backdrop" style="background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);">
       <div class="sk-modal" style="background: linear-gradient(135deg, #2a2a35, #1f1f28); border: 1px solid rgba(255,255,255,0.1);">
         <div id="g2048-modal-title" class="sk-modal-title" style="color: #edc22e; font-size: 2rem;">Game Over!</div>
         <div class="sk-modal-body" id="g2048-modal-body" style="color: #ccc; font-size: 1.1rem;">No more moves possible.</div>
         <div class="sk-modal-footer">
           <button class="g2048-btn" onclick="document.getElementById('g2048-overlay').classList.remove('open'); Game2048.newGame();">Try Again</button>
+          <button class="g2048-btn" style="background:#555;" onclick="document.getElementById('g2048-overlay').classList.remove('open'); showMenu();">Menu</button>
         </div>
       </div>
     </div>
@@ -1416,12 +1557,12 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
         <span class="btn-icon">◈</span> New Game
       </button>
       <hr class="panel-divider">
-      <button class="action-btn flag-mode" id="ms-flag-btn" onclick="Minesweeper.toggleFlagMode()">
-        <span class="btn-icon">⚑</span> Flag
-      </button>
-      <button class="action-btn qmark" id="ms-qmark-btn" onclick="Minesweeper.toggleQmarkMode()">
-        <span class="btn-icon">?</span> Question
-      </button>
+      <div style="font-size: 10px; color: var(--muted); padding: 8px 12px; border: 1px dashed var(--border); border-radius: 4px; line-height: 1.6; letter-spacing: 1px;">
+        <div style="color: var(--text); margin-bottom: 6px; font-weight: bold; text-transform: uppercase;">Controlling:</div>
+        <div style="margin-bottom: 4px;">• <b style="color:var(--correct);">Left Click</b>: Reveal Cell</div>
+        <div style="margin-bottom: 4px;">• <b style="color:var(--wrong);">Right Click</b>: Place Flag ⚑</div>
+        <div>• <b style="color:var(--hint);">Click Number</b>: Auto-reveal if flags match</div>
+      </div>
       <hr class="panel-divider">
       <button class="action-btn solver" id="ms-solver-btn" onclick="Minesweeper.solveStep()">
         <span class="btn-icon">⬡</span> Solve Step
@@ -1735,15 +1876,8 @@ window.Sudoku = (function() {
   // ── Server ─────────────────────────────────────────────────
   async function checkServer() {
     try {
-      var res = await fetch(API + '/solve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ puzzle: [5,3,0,0,7,0,0,0,0,6,0,0,1,9,5,0,0,0,0,9,8,0,0,0,0,6,0,
-                                        8,0,0,0,6,0,0,0,3,4,0,0,8,0,3,0,0,1,7,0,0,0,2,0,0,0,6,
-                                        0,6,0,0,0,0,2,8,0,0,0,0,4,1,9,0,0,5,0,0,0,0,8,0,0,7,9] }),
-        signal: AbortSignal.timeout(2000),
-      });
-      serverOnline = res.ok;
+      await fetch(API + '/', { method: 'GET', mode: 'no-cors', signal: AbortSignal.timeout(2000) });
+      serverOnline = true;
     } catch(e) { serverOnline = false; }
     document.getElementById('sk-server-dot').className   = 'server-dot' + (serverOnline ? ' online' : '');
     document.getElementById('sk-server-label').textContent = serverOnline ? 'Prolog — online' : 'Prolog — offline (local mode)';
@@ -2289,8 +2423,7 @@ window.Minesweeper = (function() {
   var firstClick  = true;
   var timerSec    = 0;
   var timerInt    = null;
-  var flagMode    = false;
-  var qmarkMode   = false;
+  var timerInt    = null;
   var bestTimes   = JSON.parse(localStorage.getItem('ms_best') || '{}');
   var serverOnline = false;
   var lastHints   = null;
@@ -2379,13 +2512,36 @@ window.Minesweeper = (function() {
       else if (counts[i] > 0) { el.classList.add('n' + counts[i]); el.textContent = counts[i]; }
     } else if (flagged[i]) {
       el.classList.add('flagged');   el.textContent = '⚑';
-    } else if (questioned[i]) {
-      el.classList.add('question');  el.textContent = '?';
     }
   }
 
+  function updateCellSize() {
+    var boardEl = document.getElementById('ms-board');
+    if (!boardEl) return;
+    var windowW = document.documentElement.clientWidth;
+    var containerWidth = Math.min(windowW, 1600);
+    
+    var subtract = 60; // Mobile (padding + buffer)
+    if (windowW > 700) {
+      var sidePanel = document.querySelector('#game-minesweeper .side-panel');
+      var sideW = sidePanel ? sidePanel.offsetWidth : 280;
+      subtract = 48 + 32 + sideW + 16; // padding + gap + sidebar + buffer
+    }
+    
+    var available = containerWidth - subtract;
+    var rawSize = Math.floor(available / cfg.cols);
+    var finalSize = Math.max(12, Math.min(rawSize, 42));
+    boardEl.style.setProperty('--cell-size', finalSize + 'px');
+    boardEl.style.width  = 'max-content';
+    boardEl.style.height = 'max-content';
+  }
+
+  window.addEventListener('resize', updateCellSize);
+
   function renderBoard() {
     var boardEl = document.getElementById('ms-board');
+    updateCellSize();
+    
     boardEl.style.gridTemplateColumns = 'repeat(' + cfg.cols + ', var(--cell-size))';
     boardEl.style.gridTemplateRows    = 'repeat(' + cfg.rows + ', var(--cell-size))';
     boardEl.innerHTML = '';
@@ -2412,9 +2568,8 @@ window.Minesweeper = (function() {
   // ── Input ──────────────────────────────────────────────────
   function onLeftClick(i) {
     if (gameState === 'won' || gameState === 'lost') return;
-    if (flagged[i] || questioned[i]) return;
+    if (flagged[i]) return;
     if (revealed[i]) { chordReveal(i); return; }
-    if (flagMode || qmarkMode) { onRightClick(i); return; }
     if (firstClick) {
       firstClick = false;
       generateBoard(i);
@@ -2429,9 +2584,7 @@ window.Minesweeper = (function() {
   function onRightClick(i) {
     if (gameState === 'won' || gameState === 'lost') return;
     if (revealed[i]) return;
-    if (flagged[i])        { flagged[i] = false;    questioned[i] = true; }
-    else if (questioned[i]){ questioned[i] = false; }
-    else                   { flagged[i] = true; }
+    flagged[i] = !flagged[i];
     renderCell(i);
     updateMineCounter();
   }
@@ -2454,19 +2607,6 @@ window.Minesweeper = (function() {
     } else { checkWin(); }
   }
 
-  function toggleFlagMode() {
-    flagMode  = !flagMode;
-    qmarkMode = false;
-    document.getElementById('ms-flag-btn').classList.toggle('active', flagMode);
-    document.getElementById('ms-qmark-btn').classList.remove('active');
-  }
-
-  function toggleQmarkMode() {
-    qmarkMode = !qmarkMode;
-    flagMode  = false;
-    document.getElementById('ms-qmark-btn').classList.toggle('active', qmarkMode);
-    document.getElementById('ms-flag-btn').classList.remove('active');
-  }
 
   // ── Win / Lose ─────────────────────────────────────────────
   function checkWin() {
@@ -2551,10 +2691,6 @@ window.Minesweeper = (function() {
     questioned = Array(total).fill(false);
     gameState  = 'idle';
     firstClick = true;
-    flagMode   = false;
-    qmarkMode  = false;
-    document.getElementById('ms-flag-btn').classList.remove('active');
-    document.getElementById('ms-qmark-btn').classList.remove('active');
     resetTimer();
     renderBoard();
     renderLeaderboard();
@@ -2562,8 +2698,6 @@ window.Minesweeper = (function() {
 
   // ── Keyboard ───────────────────────────────────────────────
   function onKeydown(e) {
-    if (e.key === 'f' || e.key === 'F') toggleFlagMode();
-    if (e.key === 'q' || e.key === 'Q') toggleQmarkMode();
     if (e.key === 'r' || e.key === 'R') newGame();
     if (e.key === 's' || e.key === 'S') solveStep();
   }
@@ -2581,13 +2715,8 @@ window.Minesweeper = (function() {
   // ── Prolog server ──────────────────────────────────────────
   async function checkServer() {
     try {
-      var res = await fetch(API + '/analyse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ board: Array(9).fill(-2), rows: 3, cols: 3 }),
-        signal: AbortSignal.timeout(2000),
-      });
-      serverOnline = res.ok;
+      await fetch(API + '/', { method: 'GET', mode: 'no-cors', signal: AbortSignal.timeout(2000) });
+      serverOnline = true;
     } catch(e) { serverOnline = false; }
     document.getElementById('ms-server-dot').className     = 'server-dot' + (serverOnline ? ' online' : '');
     document.getElementById('ms-server-label').textContent = serverOnline ? 'Prolog online' : 'Prolog offline';
@@ -2696,7 +2825,6 @@ window.Minesweeper = (function() {
   }
 
   return { init: init, newGame: newGame, setDiff: setDiff,
-           toggleFlagMode: toggleFlagMode, toggleQmarkMode: toggleQmarkMode,
            solveStep: solveStep, onKeydown: onKeydown, pause: pause,
            hideOverlay: hideOverlay, isActive: isActive };
 
@@ -2843,8 +2971,8 @@ window.StarBattle = (function() {
     serverOnline = false;
     for (var i = 0; i < API_CANDIDATES.length; i++) {
       try {
-        var res = await fetch(API_CANDIDATES[i] + '/status', { signal: AbortSignal.timeout(1500) });
-        if (res.ok) { API = API_CANDIDATES[i]; serverOnline = true; break; }
+        await fetch(API_CANDIDATES[i] + '/', { method: 'GET', mode: 'no-cors', signal: AbortSignal.timeout(1500) });
+        API = API_CANDIDATES[i]; serverOnline = true; break;
       } catch(e) {}
     }
     var dot   = document.getElementById('sb-server-dot');
@@ -3386,6 +3514,58 @@ window.Game2048 = (function() {
   }
 
   return { init: init, newGame: newGame, onKeydown: onKeydown, isActive: isActive, pause: pause };
+})();
+</script>
+
+<script>
+// ============================================================
+// MENU SERVER STATUS POLLING
+// ============================================================
+(function() {
+  var servers = [
+    { id: 'pill-sudoku',      url: 'http://localhost:8080' },
+    { id: 'pill-starbattle',  url: 'http://localhost:8081' },
+    { id: 'pill-minesweeper', url: 'http://localhost:8082' },
+    { id: 'pill-2048',        url: 'http://localhost:8083' }
+  ];
+
+  function setPill(id, online) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('online', 'offline');
+    el.classList.add(online ? 'online' : 'offline');
+    var label = el.querySelector('.pill-label');
+    if (label) {
+      var port = label.textContent.split(' ')[0];
+      label.textContent = port + (online ? ' Online' : ' Offline');
+    }
+  }
+
+  async function pingServer(s) {
+    try {
+      // no-cors: browser connects but treats response as opaque.
+      // If it throws a NetworkError, the server is down.
+      // If it resolves (even with opaque response), server is up.
+      await fetch(s.url + '/', {
+        method: 'GET',
+        mode: 'no-cors',
+        signal: AbortSignal.timeout(2000)
+      });
+      setPill(s.id, true);
+    } catch(e) {
+      setPill(s.id, false);
+    }
+  }
+
+  function checkAllServers() {
+    servers.forEach(function(s) { pingServer(s); });
+  }
+
+  // Run on load and every 15 seconds
+  window.addEventListener('DOMContentLoaded', function() {
+    checkAllServers();
+    setInterval(checkAllServers, 15000);
+  });
 })();
 </script>
 </body>

@@ -115,12 +115,9 @@ route_move(Request) :-
     ; format('Status: 405~n~nMethod not allowed~n')
     ).
 
-handle_options(_Request) :-
-    format('Access-Control-Allow-Origin: *~n'),
-    format('Access-Control-Allow-Headers: Content-Type~n'),
-    format('Access-Control-Allow-Methods: POST, OPTIONS~n'),
-    format('Content-type: text/plain~n~n'),
-    format('OK~n').
+handle_options(Request) :-
+    cors_enable(Request, [methods([post, options])]),
+    format('Content-type: text/plain~n~n').
 
 handle_new(_Request) :-
     cors_enable,
