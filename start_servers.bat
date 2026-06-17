@@ -7,28 +7,6 @@ echo   PROLOG ARCADE - A iniciar todos os servidores
 echo ===============================================
 echo.
 
-REM ── Verificar se o SWI-Prolog esta instalado ──────────────
-where swipl >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    color 0C
-    echo [ERRO] O SWI-Prolog nao foi encontrado no seu sistema!
-    echo.
-    echo Para correr o Prolog Arcade, e necessario instalar o SWI-Prolog.
-    echo.
-    echo  1. Aceda a: https://www.swi-prolog.org/download/stable
-    echo  2. Descarregue o instalador para Windows (.exe)
-    echo  3. Durante a instalacao, certifique-se de que a opcao
-    echo     "Add swipl to PATH" esta ATIVADA
-    echo  4. Reinicie o computador e execute este ficheiro novamente
-    echo.
-    echo ===============================================
-    pause
-    exit /b 1
-)
-
-echo [OK] SWI-Prolog encontrado. A iniciar servidores...
-echo.
-
 echo [8080] Sudoku...
 start "Sudoku :8080" cmd /k "title Sudoku :8080 && color 0B && swipl -s sudoku.pl"
 timeout /t 1 /nobreak >nul
