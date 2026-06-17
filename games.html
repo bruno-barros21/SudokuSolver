@@ -2507,9 +2507,19 @@ window.Minesweeper = (function() {
     el.className   = 'cell';
     el.textContent = '';
     if (revealed[i]) {
-      el.classList.add('revealed');
-      if (mines[i])        { el.textContent = '✸'; }
-      else if (counts[i] > 0) { el.classList.add('n' + counts[i]); el.textContent = counts[i]; }
+      if (mines[i]) {
+        el.classList.add('revealed');
+        el.textContent = '✸';
+      } else if (counts[i] > 0) {
+        el.classList.add('revealed', 'n' + counts[i]);
+        el.textContent = counts[i];
+      } else if (flagged[i]) {
+        // blank revealed cell with a flag — show the flag on top
+        el.classList.add('flagged');
+        el.textContent = '⚑';
+      } else {
+        el.classList.add('revealed');
+      }
     } else if (flagged[i]) {
       el.classList.add('flagged');   el.textContent = '⚑';
     }
@@ -2583,7 +2593,10 @@ window.Minesweeper = (function() {
 
   function onRightClick(i) {
     if (gameState === 'won' || gameState === 'lost') return;
-    if (revealed[i]) return;
+    // Block flagging only on revealed cells that show a number
+    if (revealed[i] && counts[i] > 0) return;
+    // Block flagging on revealed mine cells (game would already be lost)
+    if (revealed[i] && mines[i]) return;
     flagged[i] = !flagged[i];
     renderCell(i);
     updateMineCounter();
