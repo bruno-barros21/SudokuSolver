@@ -243,6 +243,14 @@ body::before {
   color: var(--given);
   line-height: 1;
   transition: color 0.25s;
+  white-space: nowrap;
+}
+.mine-card .card-title {
+  font-size: clamp(24px, 4.2vw, 38px);
+  white-space: normal;
+}
+.star-card .card-title {
+  white-space: normal;
 }
 .game-card:hover .card-title           { color: var(--accent); }
 .game-card.mine-card:hover .card-title  { color: var(--wrong); }
@@ -1304,7 +1312,7 @@ input:checked + .toggle-track::after        { transform: translateX(16px); backg
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showGame('minesweeper')}">
       <div class="card-server-pill" id="pill-minesweeper"><span class="pill-dot"></span><span class="pill-label">:8082</span></div>
       <div class="card-icon">✸</div>
-      <div class="card-title">MINE<span style="color:var(--wrong)">sweeper</span></div>
+      <div class="card-title">MINE<br><span style="color:var(--wrong)">sweeper</span></div>
       <div class="card-desc">
         Deduction · Risk · Survival<br>
         3 board sizes · Solver assistant
